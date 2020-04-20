@@ -60,9 +60,9 @@ void Widget::onOpenFile()
             data.isDelete = false;
             if (vecData.contains(data))
             {
-                data.checked = true;
                 int index = vecData.indexOf(data);
                 data.equalRow = vecData[index].row;
+                vecData[index].equalRow = data.row;
                 equalCount++;
                 QString log;
                 qDebug()<<QString::fromLocal8Bit("重复：%1行和%2行").arg(vecData[index].row+1).arg(data.row+1);
@@ -107,6 +107,29 @@ void Widget::onOpenFile()
         out.write(listArr.at(0).toLocal8Bit());
         out.write(listArr.at(1).toLocal8Bit());
         out.write(listArr.at(2).toLocal8Bit());
+    }
+    for (int i=0; i < vecData.size(); i++)
+    {
+        for (int j=0; j < vecData.size(); j++)
+        {
+            if (i == j)
+            {
+                continue;
+            }
+            if (vecData.at(j).checked)
+            {
+                continue;
+            }
+            if (vecData.at(i) == vecData.at(j))
+            {
+                vecData[i].data += ",";
+                vecData[i].data += QString::fromLocal8Bit("重复");
+                vecData[i].data += ",";
+                vecData[i].data += QString::fromLocal8Bit("与%1行重复").arg(j+3+1);
+            }
+        }
+        vecData[i].checked = true;
+        qDebug()<<"vecData"<<i;
     }
     for (int i=0; i < vecData.size(); i++)
     {
