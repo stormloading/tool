@@ -132,11 +132,18 @@ public slots:
     void onSelectSplitFile();
     void onSplit();
 
+    void onCompare();
+    void onSelectFile1();
+    void onSelectFile2();
+
 private:
     void initHash();
     bool checkInput();
 
     bool checkSplit();
+
+
+    bool checkCompare();
 
 private:
     Ui::Widget *ui;
@@ -145,6 +152,9 @@ private:
     QString m_inFile;
     QString m_inSplitFile;
     QString m_splitSymbol;
+
+    QString m_file1;
+    QString m_file2;
 };
 
 class CheckThread : public QThread
