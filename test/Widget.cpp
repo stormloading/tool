@@ -14,20 +14,37 @@ Widget::Widget(QWidget *parent)
     ui->progressBar->setMaximum(100);
     ui->progressBar->setMinimum(0);
     ui->progressBar->setValue(0);
+
     ui->progressBar_Split->setMaximum(100);
     ui->progressBar_Split->setMinimum(0);
     ui->progressBar_Split->setValue(0);
+
+    ui->progressBar_Compare->setMaximum(100);
+    ui->progressBar_Compare->setMinimum(0);
+    ui->progressBar_Compare->setValue(0);
+
     ui->lineEdit_SortColumn->setText("AF;AJ;AK");
     ui->lineEdit_DataColumn->setText("M;S;Y");
     ui->lineEdit_Out->setText("out.csv");
 
     ui->lineEdit_FolderSplit->setText("A;B");
     ui->lineEdit_TableSplit->setText("A;B;D");
+    ui->lineEdit_Split->setText("_");
+
+    ui->lineEdit_Name1->setText("A");
+    ui->lineEdit_SAP1->setText("O;U;AA;AK");
+    ui->lineEdit_Name2->setText("L");
+    ui->lineEdit_SAP2->setText("C");
     initHash();
     connect(ui->pBtn_SelectFile, SIGNAL(clicked(bool)), this, SLOT(onSelectFile()));
     connect(ui->pBtn_SelectSplitFile, SIGNAL(clicked(bool)), this, SLOT(onSelectSplitFile()));
     connect(ui->pBtn_Proc, SIGNAL(clicked(bool)), this, SLOT(onProc()));
     connect(ui->pBtn_Split, SIGNAL(clicked(bool)), this, SLOT(onSplit()));
+
+    connect(ui->pBtn_SelectFile1, SIGNAL(clicked(bool)), this, SLOT(onSelectFile1()));
+    connect(ui->pBtn_SelectFile2, SIGNAL(clicked(bool)), this, SLOT(onSelectFile2()));
+    connect(ui->pBtn_Compare, SIGNAL(clicked(bool)), this, SLOT(onCompare()));
+    connect(ui->pushButton, SIGNAL(clicked(bool)), this, SLOT(onTest()));
 }
 
 Widget::~Widget()
@@ -333,12 +350,13 @@ void Widget::onSplit()
     QByteArray arr = file.readAll();
     QTextCodec *codec = QTextCodec::codecForName("GB18030");
     QString string = codec->toUnicode(arr);
+    file.close();
 
     QMap<QString, QHash<QString, QList<SData> > > hashData;//文件夹-表-记录
     QStringList list = string.split("\n");
     for (int i=3; i < list.size(); i++)
     {
-        ui->progressBar_Split->setValue(50*i/list.size());
+        ui->progressBar_Split->setValue(100*i/list.size());
         SData data;
         QString tmp = list.at(i);
         QStringList rec = tmp.split(",");
@@ -415,13 +433,14 @@ void Widget::onSplit()
     for ( ;iteFolder != hashData.end(); iteFolder++)
     {
         QString folderName = iteFolder.key();
-        QDir dir(folderName);
+        QString path = QDir::currentPath() + "/" + folderName;
+        QDir dir(path);
         if (!dir.exists())
         {
-			bool ok = dir.mkpath(folderName);
+            bool ok = dir.mkpath(path);
             if (!ok)
             {
-                qDebug()<<QString("mkdir %1 fail!").arg(folderName);
+                qDebug()<<QString("mkdir %1 fail!").arg(path);
                 continue;
             }
         }
@@ -449,6 +468,413 @@ void Widget::onSplit()
 			out.close();
         }
     }
+    ui->progressBar_Split->setValue(100);
+}
+
+void Widget::onCompare()
+{
+    ui->progressBar_Compare->setValue(0);
+    QFile file(m_file1);
+    if (!file.open(QIODevice::ReadOnly))
+    {
+        qDebug()<<"open m_file1 file failed";
+        return;
+    }
+    QByteArray arr = file.readAll();
+    QTextCodec *codec = QTextCodec::codecForName("GB18030");
+    QString string = codec->toUnicode(arr);
+
+    file.close();
+
+    QList<int> listSAP;
+    QString SAP1 = ui->lineEdit_SAP1->text();
+    SAP1.replace("；",";");
+
+    QStringList sap1List = SAP1.split(";");
+
+    for (int i=0; i < sap1List.size(); i++)
+    {
+        QHash<QString, int>::iterator ite = g_hashColumn.find(sap1List.at(i));
+        if (ite == g_hashColumn.end())
+        {
+            QString err = QString::fromLocal8Bit("未识别的匹配列:%1！").arg(sap1List.at(i));
+            QMessageBox::warning(this, QString::fromLocal8Bit("警告"), err, QMessageBox::Ok);
+            return;
+        }
+        listSAP.push_back(ite.value());
+    }
+
+    QList<int> outColumnlist;
+    QString outColumn = ui->lineEdit_OutColumn->text();
+    outColumn.replace("；",";");
+
+    QStringList outList = outColumn.split(";");
+
+    for (int i=0; i < outList.size(); i++)
+    {
+		QHash<QString, int>::iterator ite = g_hashColumn.find(outList.at(i));
+        if (ite == g_hashColumn.end())
+        {
+			QString err = QString::fromLocal8Bit("未识别的输出列:%1！").arg(outList.at(i));
+            QMessageBox::warning(this, QString::fromLocal8Bit("警告"), err, QMessageBox::Ok);
+            return;
+        }
+        outColumnlist.push_back(ite.value());
+    }
+
+    int nameCol1 = -1;
+    QHash<QString, int>::iterator ite = g_hashColumn.find(ui->lineEdit_Name1->text());
+    if (ite == g_hashColumn.end())
+    {
+        QString err = QString::fromLocal8Bit("未识别的名字列1！");
+        QMessageBox::warning(this, QString::fromLocal8Bit("警告"), err, QMessageBox::Ok);
+        return;
+    }
+    nameCol1 = ite.value();
+
+    int nameCol2 = -1;
+    ite = g_hashColumn.find(ui->lineEdit_Name2->text());
+    if (ite == g_hashColumn.end())
+    {
+        QString err = QString::fromLocal8Bit("未识别的名字列2！");
+        QMessageBox::warning(this, QString::fromLocal8Bit("警告"), err, QMessageBox::Ok);
+        return;
+    }
+    nameCol2 = ite.value();
+    int SAP2 = -1;
+    ite = g_hashColumn.find(ui->lineEdit_SAP2->text());
+    if (ite == g_hashColumn.end())
+    {
+        QString err = QString::fromLocal8Bit("未识别的名字列2！");
+        QMessageBox::warning(this, QString::fromLocal8Bit("警告"), err, QMessageBox::Ok);
+        return;
+    }
+    SAP2 = ite.value();
+//    g_keyList.clear();
+//    g_keyList.push_back(nameCol2);
+//    g_keyList.push_back(SAP2);
+
+
+    ui->progressBar_Compare->setValue(1);
+    QList<SData> listData1;
+    QStringList list = string.split("\n");
+    for (int i=3; i < list.size(); i++)
+    {
+        SData data;
+        QString tmp = list.at(i);
+        QStringList rec = tmp.split(",");
+        if (rec.size() >= 39)
+        {
+            data.row = i;
+            data.list = rec;
+            data.data = tmp;
+            data.isChecked = false;
+            listData1.push_back(data);
+        }
+        else
+        {
+            qDebug()<<QString("row < 39");
+        }
+    }
+    ui->progressBar_Compare->setValue(5);
+
+
+    //读取file2
+    QFile file2(m_file2);
+    if (!file2.open(QIODevice::ReadOnly))
+    {
+        qDebug()<<"open m_file2 file failed";
+        return;
+    }
+    QByteArray arr2 = file2.readAll();
+    QTextCodec *codec2 = QTextCodec::codecForName("GB18030");
+    QString string2 = codec2->toUnicode(arr2);
+
+    QList<SData> listData2;
+//    QMap<SData, int> mapData;
+    string2.replace("\r", "");
+    QStringList list2 = string2.split("\n");
+    QHash<QString, SCompare> hashData;
+    for (int i=1; i < list2.size(); i++)
+    {
+        ui->progressBar_Compare->setValue(5+5*i/list2.size());
+        SData data;
+        QString tmp = list2.at(i);
+        QStringList rec = tmp.split(",");
+        if (rec.size() >= 11)
+        {
+            data.row = i;
+            data.list = rec;
+            data.data = tmp;
+            data.isChecked = false;
+            listData2.push_back(data);
+            QHash<QString, SCompare>::iterator ite = hashData.find(data.list.at(nameCol2));
+            if (ite == hashData.end())
+            {
+                SCompare com;
+                com.exist = false;
+                com.list.push_back(data);
+                hashData.insert(data.list.at(nameCol2), com);
+            }
+            else
+            {
+                ite.value().list.push_back(data);
+            }
+//            mapData.insert(data, i-1);//list的index
+        }
+        else
+        {
+            qDebug()<<QString("row < 11");
+        }
+    }
+    file2.close();
+
+    ui->progressBar_Compare->setValue(11);
+    //交叉比对
+
+    for (int i=0; i < listData1.size(); i++)
+    {
+        ui->progressBar_Compare->setValue(11+80*i/listData1.size());
+        QApplication::processEvents();
+        for (int j=0; j < listSAP.size(); j++)
+        {
+            SData data = listData1.at(i);
+            QString name = listData1.at(i).list.at(nameCol1);
+			QHash<QString, SCompare>::iterator ite = hashData.find(name);
+            if (ite == hashData.end())
+            {
+                qDebug()<<"table 1 exist, table2 not exist!";
+                if (!listData1[i].data.contains(QString::fromLocal8Bit("未匹配到名字")))
+                {
+					listData1[i].data.replace("\r", "");
+                    listData1[i].data += ",";
+                    listData1[i].data += QString::fromLocal8Bit("未匹配到名字");
+                    listData1[i].data += "\r";
+                }
+//                listData1[i].data += ",";
+//                listData1[i].data += QString::fromLocal8Bit("第%1个SAP").arg(j+1);
+//                listData1[i].data += "\r";
+            }
+            else
+            {
+                ite.value().exist = true;
+                bool exist = false;
+                QString sap = listData1.at(i).list.at(listSAP.at(j));
+                if (sap.isEmpty())
+                {
+                    continue;
+                }
+                for (int k=0; k < ite.value().list.size(); k++)
+                {
+                    if (ite.value().list.at(k).list.at(SAP2) == listData1.at(i).list.at(listSAP.at(j)))
+                    {
+                        ite.value().list[k].isChecked = true;
+                        listData2[ite.value().list[k].row-1].isChecked = true;
+                        exist = true;
+                        break;
+                    }
+                }
+                if (!exist)
+                {
+                    listData1[i].data.replace("\r", "");
+                    if (!listData1[i].data.contains(QString::fromLocal8Bit("未匹配")))
+                    {
+                        listData1[i].data += ",";
+                        listData1[i].data += QString::fromLocal8Bit("未匹配");
+                    }
+                    listData1[i].data += ",";
+                    listData1[i].data += QString::fromLocal8Bit("第%1个SAP").arg(j+1);
+                    listData1[i].data += "\r";
+                }
+            }
+//            data.list[nameCol2] = listData1.at(i).list.at(nameCol1);
+//            data.list[SAP2] = listData1.at(i).list.at(listSAP.at(j));
+//            QMap<SData, int>::iterator ite = mapData.find(data);
+//            if (ite == mapData.end())
+//            {
+//                qDebug()<<"table 1 exist, table2 not exist!";
+//            }
+//            else
+//            {
+//                listData2[ite.value()].isChecked = true;//已比对
+//                qDebug()<<"exist!";
+//            }
+        }
+    }
+
+    ui->progressBar_Compare->setValue(92);
+    QFile source(QString::fromLocal8Bit("表1未匹配数据.csv"));
+    if (!source.open(QIODevice::ReadWrite | QIODevice::Truncate))
+    {
+        qDebug()<<"open out file failed!";
+        return;
+    }
+    if (list.size() >=3)
+    {
+        source.write(list.at(0).toLocal8Bit());
+        source.write(list.at(1).toLocal8Bit());
+        source.write(list.at(2).toLocal8Bit());
+    }
+    for (int i=0; i < listData1.size(); i++)
+    {
+        source.write(listData1.at(i).data.toLocal8Bit());
+    }
+    source.close();
+
+    ui->progressBar_Compare->setValue(94);
+    QFile out(QString::fromLocal8Bit("表2未匹配数据.csv"));
+    if (!out.open(QIODevice::ReadWrite | QIODevice::Truncate))
+    {
+        qDebug()<<"open out file1 failed!";
+        return;
+    }
+    if (list2.size() >=1)
+    {
+        out.write(list2.at(0).toLocal8Bit());
+        out.write(QString("\n").toLocal8Bit());
+    }
+    for (int i=0; i < listData2.size(); i++)
+    {
+        if (!listData2.at(i).isChecked)
+        {
+            out.write(listData2.at(i).data.toLocal8Bit());
+            out.write(QString("\n").toLocal8Bit());
+        }
+    }
+    out.close();
+
+    ui->progressBar_Compare->setValue(96);
+//    int colName = -1;
+//    int colMuch = -1;
+//    int colDate = -1;
+//    int colSAP = -1;
+//    int colText = -1;
+//    QStringList listHeader = list2.at(0).split(",");
+//    for (int i=0; i < listHeader.size(); i++)
+//    {
+//        if (listHeader.at(i).contains(QString::fromLocal8Bit("名称")))
+//        {
+//            colName    = i;
+//        }
+//        if (listHeader.at(i).contains(QString::fromLocal8Bit("金额")))
+//        {
+//            colMuch    = i;
+//        }
+//        if (listHeader.at(i).contains(QString::fromLocal8Bit("日期")))
+//        {
+//            colDate    = i;
+//        }
+//        if (listHeader.at(i).contains(QString::fromLocal8Bit("编号")))
+//        {
+//            colSAP    = i;
+//        }
+//        if (listHeader.at(i).contains(QString::fromLocal8Bit("文本")))
+//        {
+//            colText    = i;
+//        }
+//    }
+
+//    if (colName == -1 || colMuch == -1
+//        || colDate == -1 || colSAP == -1 || colText == -1  )
+//    {
+//        qDebug()<<"parse out file2 failed!";
+//        return;
+//    }
+
+    ui->progressBar_Compare->setValue(98);
+    QFile out2(QString::fromLocal8Bit("表2未匹配筛选数据.csv"));
+    if (!out2.open(QIODevice::ReadWrite | QIODevice::Truncate))
+    {
+        qDebug()<<"open out file2 failed!";
+        return;
+    }
+    QString arrHeader = QString::fromLocal8Bit("名称,金额,日期,编号,文本");
+    if (list2.size() >=1)
+    {
+        out2.write(arrHeader.toLocal8Bit());
+        out2.write(QString("\n").toLocal8Bit());
+    }
+    for (int i=0; i < listData2.size(); i++)
+    {
+        QString key = listData2.at(i).list.at(nameCol2);
+
+        QHash<QString, SCompare>::iterator ite = hashData.find(key);
+        if (ite == hashData.end())
+        {
+            continue;
+        }
+        if (ite.value().exist)
+        {
+            for (int j=0; j < ite.value().list.size(); j++)
+            {
+                if (!ite.value().list.at(j).isChecked && ite.value().list.at(j).row == i)
+                {
+                    SData data = ite.value().list.at(j);
+                    QString content;
+                    for (int k = 0; k < outColumnlist.size(); k++)
+                    {
+                        if (k > 0)
+                        {
+                            content += ",";
+                        }
+                        content += ite.value().list.at(j).list.at(outColumnlist.at(k));
+                    }
+                    content += "\n";
+					out2.write(content.toLocal8Bit());
+                }
+            }
+        }
+    }
+    out2.close();
+    ui->progressBar_Compare->setValue(100);
+//    for (int i=0; i < listData2.size(); i++)
+//    {
+//        if (!listData2.at(i).isChecked)
+//        {
+////            qDebug()<<QString::fromLocal8Bit("行%1未发现匹配项。").arg(i+1);
+//        }
+//        else
+//        {
+//            qDebug()<<QString::fromLocal8Bit("行%1发现匹配项。").arg(i+1);
+//        }
+//    }
+}
+
+void Widget::onSelectFile1()
+{
+    m_file1 = QFileDialog::getOpenFileName(this);
+    if (m_file1.isEmpty())
+    {
+        qDebug()<<"m_file1 is empty";
+        ui->lineEdit_FileName1->setText("");
+        return;
+    }
+    ui->lineEdit_FileName1->setText(m_file1);
+}
+
+void Widget::onSelectFile2()
+{
+    m_file2 = QFileDialog::getOpenFileName(this);
+    if (m_file2.isEmpty())
+    {
+        qDebug()<<"m_file2 is empty";
+        ui->lineEdit_FileName2->setText("");
+        return;
+    }
+    ui->lineEdit_FileName2->setText(m_file2);
+}
+
+void Widget::onTest()
+{
+    QAxObject *excel = NULL;    //本例中，excel设定为Excel文件的操作对象
+    QAxObject *workbooks = NULL;
+    QAxObject *workbook = NULL;  //Excel操作对象
+    excel = new QAxObject("Excel.Application");
+    excel->dynamicCall("SetVisible(bool)", false); //true 表示操作文件时可见，false表示为不可见
+
+    workbook = workbooks->querySubObject("Open(QString&)", "K:\test\汇总表-2.xlsx");
+    // 获取打开的excel文件中所有的工作sheet
+//    QAxObject * worksheets = workbook->querySubObject("WorkSheets");
 }
 
 void Widget::initHash()
@@ -518,6 +944,69 @@ bool Widget::checkInput()
 }
 
 bool Widget::checkSplit()
+{
+    if (m_inSplitFile.isEmpty())
+    {
+        QMessageBox::warning(this, QString::fromLocal8Bit("警告"), QString::fromLocal8Bit("请选择文件！"), QMessageBox::Ok);
+        return false;
+    }
+
+    QString splitSymbol = ui->lineEdit_Split->text();
+    if (splitSymbol.isEmpty())
+    {
+        QMessageBox::warning(this, QString::fromLocal8Bit("警告"), QString::fromLocal8Bit("请填写分隔符！"), QMessageBox::Ok);
+        return false;
+    }
+    m_splitSymbol = splitSymbol;
+
+    QString folderColumn = ui->lineEdit_FolderSplit->text();
+    folderColumn.replace("；",";");
+    if (!folderColumn.contains(";"))
+    {
+        QMessageBox::warning(this, QString::fromLocal8Bit("警告"), QString::fromLocal8Bit("请填写文件夹匹配列！"), QMessageBox::Ok);
+        return false;
+    }
+
+    QString tableColumn = ui->lineEdit_TableSplit->text();
+    tableColumn.replace("；",";");
+    if (!tableColumn.contains(";"))
+    {
+        QMessageBox::warning(this, QString::fromLocal8Bit("警告"), QString::fromLocal8Bit("请填写表匹配列！"), QMessageBox::Ok);
+        return false;
+    }
+
+    QStringList folderList = folderColumn.split(";");
+
+    g_keyList.clear();
+    for (int i=0; i < folderList.size(); i++)
+    {
+        QHash<QString, int>::iterator ite = g_hashColumn.find(folderList.at(i));
+        if (ite == g_hashColumn.end())
+        {
+            QString err = QString::fromLocal8Bit("未识别的匹配列:%1！").arg(folderList.at(i));
+            QMessageBox::warning(this, QString::fromLocal8Bit("警告"), err, QMessageBox::Ok);
+            return false;
+        }
+        g_keyList.push_back(ite.value());
+    }
+
+    QStringList dataList = tableColumn.split(";");
+    g_dataList.clear();
+    for (int i=0; i < dataList.size(); i++)
+    {
+        QHash<QString, int>::iterator ite = g_hashColumn.find(dataList.at(i));
+        if (ite == g_hashColumn.end())
+        {
+            QString err = QString::fromLocal8Bit("未识别的数据列:%1！").arg(dataList.at(i));
+            QMessageBox::warning(this, QString::fromLocal8Bit("警告"), err, QMessageBox::Ok);
+            return false;
+        }
+        g_dataList.push_back(ite.value());
+    }
+    return true;
+}
+
+bool Widget::checkCompare()
 {
     if (m_inSplitFile.isEmpty())
     {
