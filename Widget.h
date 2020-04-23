@@ -14,6 +14,7 @@ QT_END_NAMESPACE
 #include <QThread>
 #include <QReadWriteLock>
 #include <QTimer>
+#include <QAxObject>
 
 extern QList<int> g_keyList;
 extern QList<int> g_dataList;
@@ -117,6 +118,13 @@ struct SData
     }
 };
 
+struct SCompare
+{
+    bool exist;
+
+    QList<SData> list;
+};
+
 class Widget : public QWidget
 {
     Q_OBJECT
@@ -136,6 +144,8 @@ public slots:
     void onSelectFile1();
     void onSelectFile2();
 
+    void onTest();
+
 private:
     void initHash();
     bool checkInput();
@@ -144,6 +154,8 @@ private:
 
 
     bool checkCompare();
+
+    void convertMuch(QString &str);
 
 private:
     Ui::Widget *ui;

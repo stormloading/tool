@@ -44,6 +44,7 @@ Widget::Widget(QWidget *parent)
     connect(ui->pBtn_SelectFile1, SIGNAL(clicked(bool)), this, SLOT(onSelectFile1()));
     connect(ui->pBtn_SelectFile2, SIGNAL(clicked(bool)), this, SLOT(onSelectFile2()));
     connect(ui->pBtn_Compare, SIGNAL(clicked(bool)), this, SLOT(onCompare()));
+    connect(ui->pushButton, SIGNAL(clicked(bool)), this, SLOT(onTest()));
 }
 
 Widget::~Widget()
@@ -93,21 +94,21 @@ void Widget::onClicked()
 //           {
 //               if (data.isEmpty() && listData.at(index).isEmpty())
 //               {
-//                   qDebug()<<QString::fromLocal8Bit("重复：行%1和行%2，均无数据，不追加").arg(listData.at(index).row+1).arg(data.row+1);
+//                   qDebug()<<QString/*::fromLocal8Bit*/("重复：行%1和行%2，均无数据，不追加").arg(listData.at(index).row+1).arg(data.row+1);
 //                   continue;
 //               }
 //               else if (!data.isEmpty() && !listData.at(index).isEmpty())
 //               {
-//                   qDebug()<<QString::fromLocal8Bit("重复：行%1和行%2，均有数据").arg(listData.at(index).row+1).arg(data.row+1);
+//                   qDebug()<<QString/*::fromLocal8Bit*/("重复：行%1和行%2，均有数据").arg(listData.at(index).row+1).arg(data.row+1);
 //               }
 //               else if (data.isEmpty() && !listData.at(index).isEmpty())
 //               {
-//                   qDebug()<<QString::fromLocal8Bit("重复：行%1和行%2，前有数据，后无数据，不追加").arg(listData.at(index).row+1).arg(data.row+1);
+//                   qDebug()<<QString/*::fromLocal8Bit*/("重复：行%1和行%2，前有数据，后无数据，不追加").arg(listData.at(index).row+1).arg(data.row+1);
 //                   continue;
 //               }
 //               else if (!data.isEmpty() && listData.at(index).isEmpty())
 //               {
-//                   qDebug()<<QString::fromLocal8Bit("重复：行%1和行%2，前无数据，后有数据，删前者，追加").arg(listData.at(index).row+1).arg(data.row+1);
+//                   qDebug()<<QString/*::fromLocal8Bit*/("重复：行%1和行%2，前无数据，后有数据，删前者，追加").arg(listData.at(index).row+1).arg(data.row+1);
 //                   listData.removeAt(index);
 //               }
 //           }
@@ -131,9 +132,9 @@ void Widget::onClicked()
 //            {
 //                listData[i].data.replace("\r", "");
 //                listData[i].data += ",";
-//                listData[i].data += QString::fromLocal8Bit("重复");
+//                listData[i].data += QString/*::fromLocal8Bit*/("重复");
 //                listData[i].data += ",";
-//                listData[i].data += QString::fromLocal8Bit("与%1行重复").arg(j+3+1);
+//                listData[i].data += QString/*::fromLocal8Bit*/("与%1行重复").arg(j+3+1);
 //                listData[i].data += "\r";
 //            }
 //        }
@@ -198,8 +199,9 @@ void Widget::onProc()
         ui->progressBar->setValue(50*i/list.size());
         SData data;
         QString tmp = list.at(i);
+        convertMuch(tmp);
         QStringList rec = tmp.split(",");
-        if (rec.size() >= 39)
+        if (rec.size() > g_keyList.last())
         {
             data.row = i;
             data.list = rec;
@@ -216,13 +218,13 @@ void Widget::onProc()
                     if (data.isEmpty() && ite.key().isEmpty())
                     {
                         qDebug()<<QString/*::fromLocal8Bit*/("重复：行%1和行%2，均无数据，不追加").arg(row+1).arg(data.row+1);
-//                        ui->textEdit->append(QString::fromLocal8Bit("重复：行%1和行%2，均无数据，不追加").arg(row+1).arg(data.row+1));
+//                        ui->textEdit->append(QString/*::fromLocal8Bit*/("重复：行%1和行%2，均无数据，不追加").arg(row+1).arg(data.row+1));
                         continue;
                     }
                     else if (!data.isEmpty() && !ite.key().isEmpty())
                     {
                         qDebug()<<QString/*::fromLocal8Bit*/("重复：行%1和行%2，均有数据").arg(row+1).arg(data.row+1);
-                        ui->textEdit->append(QString::fromLocal8Bit("重复：行%1和行%2，均有数据").arg(row+1).arg(data.row+1));
+                        ui->textEdit->append(QString/*::fromLocal8Bit*/("重复：行%1和行%2，均有数据").arg(row+1).arg(data.row+1));
                     }
                     else if (data.isEmpty() && !ite.key().isEmpty())
                     {
@@ -245,7 +247,7 @@ void Widget::onProc()
         }
         else
         {
-            qDebug()<<QString/*::fromLocal8Bit*/("行%1列数少于39").arg(i);
+            qDebug()<<QString/*::fromLocal8Bit*/("行%1列数少于%2").arg(i+1).arg(g_keyList.last());
         }
 
     }
@@ -358,8 +360,9 @@ void Widget::onSplit()
         ui->progressBar_Split->setValue(100*i/list.size());
         SData data;
         QString tmp = list.at(i);
+        convertMuch(tmp);
         QStringList rec = tmp.split(",");
-        if (rec.size() >= 39)
+        if (rec.size() > g_keyList.last())
         {
             data.row = i;
             data.list = rec;
@@ -422,7 +425,7 @@ void Widget::onSplit()
         }
         else
         {
-            qDebug()<<QString/*::fromLocal8Bit*/("行%1列数少于39").arg(i);
+            qDebug()<<QString/*::fromLocal8Bit*/("行%1列数少于%2").arg(i+1).arg(g_keyList.last());
         }
 
     }
@@ -503,6 +506,24 @@ void Widget::onCompare()
         listSAP.push_back(ite.value());
     }
 
+    QList<int> outColumnlist;
+    QString outColumn = ui->lineEdit_OutColumn->text();
+    outColumn.replace("；",";");
+
+    QStringList outList = outColumn.split(";");
+
+    for (int i=0; i < outList.size(); i++)
+    {
+		QHash<QString, int>::iterator ite = g_hashColumn.find(outList.at(i));
+        if (ite == g_hashColumn.end())
+        {
+            QString err = QString/*::fromLocal8Bit*/("未识别的输出列:%1！").arg(outList.at(i));
+            QMessageBox::warning(this, QString/*::fromLocal8Bit*/("警告"), err, QMessageBox::Ok);
+            return;
+        }
+        outColumnlist.push_back(ite.value());
+    }
+
     int nameCol1 = -1;
     QHash<QString, int>::iterator ite = g_hashColumn.find(ui->lineEdit_Name1->text());
     if (ite == g_hashColumn.end())
@@ -531,19 +552,21 @@ void Widget::onCompare()
         return;
     }
     SAP2 = ite.value();
-    g_keyList.clear();
-    g_keyList.push_back(nameCol2);
-    g_keyList.push_back(SAP2);
+//    g_keyList.clear();
+//    g_keyList.push_back(nameCol2);
+//    g_keyList.push_back(SAP2);
 
 
+    ui->progressBar_Compare->setValue(1);
     QList<SData> listData1;
     QStringList list = string.split("\n");
     for (int i=3; i < list.size(); i++)
     {
         SData data;
         QString tmp = list.at(i);
+        convertMuch(tmp);
         QStringList rec = tmp.split(",");
-        if (rec.size() >= 39)
+        if (rec.size() > listSAP.last())
         {
             data.row = i;
             data.list = rec;
@@ -553,9 +576,10 @@ void Widget::onCompare()
         }
         else
         {
-            qDebug()<<QString("row < 39");
+            qDebug()<<QString("row %1< %2").arg(i+1).arg(listSAP.last());
         }
     }
+    ui->progressBar_Compare->setValue(5);
 
 
     //读取file2
@@ -570,84 +594,263 @@ void Widget::onCompare()
     QString string2 = codec2->toUnicode(arr2);
 
     QList<SData> listData2;
-    QMap<SData, int> mapData;
+//    QMap<SData, int> mapData;
     string2.replace("\r", "");
     QStringList list2 = string2.split("\n");
+    QHash<QString, SCompare> hashData;
     for (int i=1; i < list2.size(); i++)
     {
+        ui->progressBar_Compare->setValue(5+5*i/list2.size());
         SData data;
         QString tmp = list2.at(i);
+        convertMuch(tmp);
         QStringList rec = tmp.split(",");
-        if (rec.size() >= 11)
+        if (rec.size() > (nameCol2>SAP2?nameCol2:SAP2))
         {
             data.row = i;
             data.list = rec;
             data.data = tmp;
             data.isChecked = false;
             listData2.push_back(data);
-            mapData.insert(data, i-1);//list的index
+            QHash<QString, SCompare>::iterator ite = hashData.find(data.list.at(nameCol2));
+            if (ite == hashData.end())
+            {
+                SCompare com;
+                com.exist = false;
+                com.list.push_back(data);
+                hashData.insert(data.list.at(nameCol2), com);
+            }
+            else
+            {
+                ite.value().list.push_back(data);
+            }
+//            mapData.insert(data, i-1);//list的index
         }
         else
         {
-            qDebug()<<QString("row < 11");
+            qDebug()<<QString("row %1< %2").arg(i+1).arg((nameCol2>SAP2?nameCol2:SAP2));
         }
     }
     file2.close();
 
+    ui->progressBar_Compare->setValue(11);
     //交叉比对
 
     for (int i=0; i < listData1.size(); i++)
     {
-        ui->progressBar_Compare->setValue(100*i/listData1.size());
+        ui->progressBar_Compare->setValue(11+80*i/listData1.size());
+        QApplication::processEvents();
         for (int j=0; j < listSAP.size(); j++)
         {
             SData data = listData1.at(i);
-            data.list[nameCol2] = listData1.at(i).list.at(nameCol1);
-            data.list[SAP2] = listData1.at(i).list.at(listSAP.at(j));
-            QMap<SData, int>::iterator ite = mapData.find(data);
-            if (ite == mapData.end())
+            QString name = listData1.at(i).list.at(nameCol1);
+			QHash<QString, SCompare>::iterator ite = hashData.find(name);
+            if (ite == hashData.end())
             {
                 qDebug()<<"table 1 exist, table2 not exist!";
+                if (!listData1[i].data.contains(QString/*::fromLocal8Bit*/("未匹配到名字")))
+                {
+					listData1[i].data.replace("\r", "");
+                    listData1[i].data += ",";
+                    listData1[i].data += QString/*::fromLocal8Bit*/("未匹配到名字");
+                    listData1[i].data += "\r";
+                }
+//                listData1[i].data += ",";
+//                listData1[i].data += QString/*::fromLocal8Bit*/("第%1个SAP").arg(j+1);
+//                listData1[i].data += "\r";
             }
             else
             {
-                listData2[ite.value()].isChecked = true;//已比对
-                qDebug()<<"exist!";
+                ite.value().exist = true;
+                bool exist = false;
+                QString sap = listData1.at(i).list.at(listSAP.at(j));
+                if (sap.isEmpty())
+                {
+                    continue;
+                }
+                for (int k=0; k < ite.value().list.size(); k++)
+                {
+                    if (ite.value().list.at(k).list.at(SAP2) == listData1.at(i).list.at(listSAP.at(j)))
+                    {
+                        ite.value().list[k].isChecked = true;
+                        listData2[ite.value().list[k].row-1].isChecked = true;
+                        exist = true;
+                        break;
+                    }
+                }
+                if (!exist)
+                {
+                    listData1[i].data.replace("\r", "");
+                    if (!listData1[i].data.contains(QString/*::fromLocal8Bit*/("未匹配")))
+                    {
+                        listData1[i].data += ",";
+                        listData1[i].data += QString/*::fromLocal8Bit*/("未匹配");
+                    }
+                    listData1[i].data += ",";
+                    listData1[i].data += QString/*::fromLocal8Bit*/("第%1个SAP").arg(j+1);
+                    listData1[i].data += "\r";
+                }
             }
+//            data.list[nameCol2] = listData1.at(i).list.at(nameCol1);
+//            data.list[SAP2] = listData1.at(i).list.at(listSAP.at(j));
+//            QMap<SData, int>::iterator ite = mapData.find(data);
+//            if (ite == mapData.end())
+//            {
+//                qDebug()<<"table 1 exist, table2 not exist!";
+//            }
+//            else
+//            {
+//                listData2[ite.value()].isChecked = true;//已比对
+//                qDebug()<<"exist!";
+//            }
         }
     }
 
-    ui->progressBar_Compare->setValue(100);
-    QFile out("compare.csv");
-    if (!out.open(QIODevice::ReadWrite | QIODevice::Truncate))
+    ui->progressBar_Compare->setValue(92);
+    QFile source(QString/*::fromLocal8Bit*/("表1未匹配数据.csv"));
+    if (!source.open(QIODevice::ReadWrite | QIODevice::Truncate))
     {
         qDebug()<<"open out file failed!";
         return;
     }
+    if (list.size() >=3)
+    {
+        source.write(list.at(0).toLocal8Bit());
+        source.write(list.at(1).toLocal8Bit());
+        source.write(list.at(2).toLocal8Bit());
+    }
+    for (int i=0; i < listData1.size(); i++)
+    {
+        source.write(listData1.at(i).data.toLocal8Bit());
+    }
+    source.close();
+
+    ui->progressBar_Compare->setValue(94);
+    QFile out(QString/*::fromLocal8Bit*/("表2未匹配数据.csv"));
+    if (!out.open(QIODevice::ReadWrite | QIODevice::Truncate))
+    {
+        qDebug()<<"open out file1 failed!";
+        return;
+    }
     if (list2.size() >=1)
     {
-        out.write(list.at(0).toLocal8Bit());
+        out.write(list2.at(0).toLocal8Bit());
+        out.write(QString("\n").toLocal8Bit());
     }
     for (int i=0; i < listData2.size(); i++)
     {
         if (!listData2.at(i).isChecked)
         {
             out.write(listData2.at(i).data.toLocal8Bit());
+            out.write(QString("\n").toLocal8Bit());
         }
     }
     out.close();
 
+    ui->progressBar_Compare->setValue(96);
+//    int colName = -1;
+//    int colMuch = -1;
+//    int colDate = -1;
+//    int colSAP = -1;
+//    int colText = -1;
+//    QStringList listHeader = list2.at(0).split(",");
+//    for (int i=0; i < listHeader.size(); i++)
+//    {
+//        if (listHeader.at(i).contains(QString/*::fromLocal8Bit*/("名称")))
+//        {
+//            colName    = i;
+//        }
+//        if (listHeader.at(i).contains(QString/*::fromLocal8Bit*/("金额")))
+//        {
+//            colMuch    = i;
+//        }
+//        if (listHeader.at(i).contains(QString/*::fromLocal8Bit*/("日期")))
+//        {
+//            colDate    = i;
+//        }
+//        if (listHeader.at(i).contains(QString/*::fromLocal8Bit*/("编号")))
+//        {
+//            colSAP    = i;
+//        }
+//        if (listHeader.at(i).contains(QString/*::fromLocal8Bit*/("文本")))
+//        {
+//            colText    = i;
+//        }
+//    }
+
+//    if (colName == -1 || colMuch == -1
+//        || colDate == -1 || colSAP == -1 || colText == -1  )
+//    {
+//        qDebug()<<"parse out file2 failed!";
+//        return;
+//    }
+
+    ui->progressBar_Compare->setValue(98);
+    QFile out2(QString/*::fromLocal8Bit*/("表2未匹配筛选数据.csv"));
+    if (!out2.open(QIODevice::ReadWrite | QIODevice::Truncate))
+    {
+        qDebug()<<"open out file2 failed!";
+        return;
+    }
+//    QString arrHeader = QString/*::fromLocal8Bit*/("名称,金额,日期,编号,文本");
+    QString arrHeader;
+    for (int i=0; i < outColumnlist.size(); i++)
+    {
+        if (i > 0)
+        {
+            arrHeader += ",";
+        }
+        arrHeader += list2.at(0).at(outColumnlist.at(i));
+    }
+    if (list2.size() >=1)
+    {
+        out2.write(arrHeader.toLocal8Bit());
+        out2.write(QString("\n").toLocal8Bit());
+    }
     for (int i=0; i < listData2.size(); i++)
     {
-        if (!listData2.at(i).isChecked)
+        QString key = listData2.at(i).list.at(nameCol2);
+
+        QHash<QString, SCompare>::iterator ite = hashData.find(key);
+        if (ite == hashData.end())
         {
-//            qDebug()<<QString/*::fromLocal8Bit*/("行%1未发现匹配项。").arg(i+1);
+            continue;
         }
-        else
+        if (ite.value().exist)
         {
-            qDebug()<<QString/*::fromLocal8Bit*/("行%1发现匹配项。").arg(i+1);
+            for (int j=0; j < ite.value().list.size(); j++)
+            {
+                if (!ite.value().list.at(j).isChecked && ite.value().list.at(j).row == i+1)
+                {
+                    SData data = ite.value().list.at(j);
+                    QString content;
+                    for (int k = 0; k < outColumnlist.size(); k++)
+                    {
+                        if (k > 0)
+                        {
+                            content += ",";
+                        }
+                        content += ite.value().list.at(j).list.at(outColumnlist.at(k));
+                    }
+                    content += "\n";
+					out2.write(content.toLocal8Bit());
+                }
+            }
         }
     }
+    out2.close();
+    ui->progressBar_Compare->setValue(100);
+//    for (int i=0; i < listData2.size(); i++)
+//    {
+//        if (!listData2.at(i).isChecked)
+//        {
+////            qDebug()<<QString/*::fromLocal8Bit*/("行%1未发现匹配项。").arg(i+1);
+//        }
+//        else
+//        {
+//            qDebug()<<QString/*::fromLocal8Bit*/("行%1发现匹配项。").arg(i+1);
+//        }
+//    }
 }
 
 void Widget::onSelectFile1()
@@ -674,6 +877,147 @@ void Widget::onSelectFile2()
     ui->lineEdit_FileName2->setText(m_file2);
 }
 
+void Widget::onTest()
+{
+    QStringList listNames = QFileDialog::getOpenFileNames(this);
+    if (listNames.size() == 0)
+    {
+        qDebug()<<"listNames is empty";
+        return;
+    }
+
+    QAxObject *excel = NULL;
+    QAxObject *workbooks = NULL;
+    QAxObject *workbook = NULL;
+    excel = new QAxObject("Excel.Application");
+    if (!excel)
+    {
+        qDebug() << "EXCEL对象丢失!";
+    }
+    excel->dynamicCall("SetVisible(bool)", false);
+    workbooks = excel->querySubObject("WorkBooks");
+    //        QString FileName = "C:/Users/storm/Desktop/test/汇总表-2.xlsx";
+
+    QVariantList header;
+    QList<QList<QVariant> > allDataList;
+    for (int i=0; i < listNames.size(); i++)
+    {
+        QString FileName = listNames.at(i);
+        qDebug()<<QString/*::fromLocal8Bit*/("打开文件:%1").arg(FileName);
+        workbook = workbooks->querySubObject("Open(QString, QVariant)", FileName);
+
+        qDebug()<<QString/*::fromLocal8Bit*/("读取文件内容");
+        QAxObject * worksheet = workbook->querySubObject("WorkSheets(int)", 1);//打开第一个sheet
+        QAxObject * usedrange = worksheet->querySubObject("UsedRange");//获取该sheet的使用范围对象
+        QAxObject * rows = usedrange->querySubObject("Rows");
+        QAxObject * columns = usedrange->querySubObject("Columns");
+        int intRows = rows->property("Count").toInt();
+        int intCols = columns->property("Count").toInt();
+        qDebug() << "xls行数："<<intRows;
+        qDebug() << "xls列数："<<intCols;
+
+        QString Range;
+        if (i == 0)
+        {
+            Range = "A1:K" +QString::number(intRows);
+        }
+        else
+        {
+            Range = "A2:K" +QString::number(intRows);
+        }
+
+        QAxObject *fileData = worksheet->querySubObject("Range(QString)", Range);
+        QVariant docDataQVariant = fileData->property("Value");
+        qDebug()<<QString/*::fromLocal8Bit*/("处理文件内容");
+        QVariantList docDataList = docDataQVariant.toList();
+        QList<QVariant> oneRecord;
+//        QList<QList<QVariant> > oneFile;
+        for (int i=0; i < docDataList.size(); i++)
+        {
+            oneRecord = docDataList.at(i).toList();
+            QFileInfo info(FileName);
+            oneRecord.append(QVariant(info.fileName()));
+            allDataList.append(oneRecord);
+//            QList<>docDataList.at(i).toList().append(QVariant(FileName));
+        }
+        if (i == 0 && allDataList.size() > 0)
+        {
+            QList<QVariant> first = allDataList.first();
+            first.removeLast();
+            first.append(QString/*::fromLocal8Bit*/("文件名"));
+            allDataList.removeFirst();
+            allDataList.push_front(first);
+//            header = docDataList.at(0).toList();
+//            qDebug()<<"header"<<header;
+        }
+//        allDataList.append(oneFile);
+
+        qDebug()<<QString/*::fromLocal8Bit*/("关闭文件");
+        workbook->dynamicCall("Close (Boolean)", false);
+    }
+//    qDebug()<<"data"<<allEnvDataList;
+    qDebug()<<QString/*::fromLocal8Bit*/("所有文件读取完毕，处理中");
+
+
+    //处理数据
+    for (int i=0; i < allDataList.size(); i++)
+    {
+        if (allDataList.at(i).at(2).toString().isEmpty())
+        {
+            allDataList.removeAt(i);
+            i--;
+        }
+    }
+
+    //输出文件
+    qDebug()<<QString/*::fromLocal8Bit*/("回写文件");
+    QString xlsFile = QDir::currentPath() + QString/*::fromLocal8Bit*/("/合并.xlsx");
+    QFile file(xlsFile);
+    while(file.exists())
+    {
+        bool ok = file.remove(xlsFile);
+        if (!ok)
+        {
+            qDebug()<<QString/*::fromLocal8Bit*/("删除文件%1失败！").arg(xlsFile);
+            QMessageBox::warning(this, QString/*::fromLocal8Bit*/("警告"),
+                                 QString/*::fromLocal8Bit*/("请先删除文件后点击确定重试！"), QMessageBox::Ok);
+        }
+    }
+
+    qDebug()<<QString/*::fromLocal8Bit*/("打开文件:%1").arg(xlsFile);
+    workbooks->dynamicCall("Add");   //添加一个新的工作薄
+    workbook = excel->querySubObject("ActiveWorkBook");
+
+    QAxObject *worksheets = workbook->querySubObject("Sheets");//获取工作表集合
+    QAxObject *worksheet = worksheets->querySubObject("Item(int)", 1);//获取工作表集合的工作表1，即sheet1
+
+    int row = allDataList.size();
+    int col = allDataList.at(0).size();
+    QString rangStr = "A1:L" +QString::number(row);
+    qDebug()<<rangStr;
+    QAxObject *range = worksheet->querySubObject("Range(const QString&)",rangStr);
+    if(NULL == range || range->isNull())
+    {
+        return;
+    }
+    bool succ = false;
+    QVariant vars;
+    QVariantList list;
+    for (int i=0; i < allDataList.size(); i++)
+    {
+        list.append(QVariant(allDataList.at(i)));
+    }
+    vars = QVariant(list);
+    succ = range->setProperty("Value", vars);
+//    delete range;
+    workbook->dynamicCall("SaveAs(const QString&)", QDir::toNativeSeparators(xlsFile));//保存至filepath，注意一定要用QDir::toNativeSeparators将路径中的"/"转换为"\"，不然一定保存不了。
+    workbook->dynamicCall("Close()");
+
+    workbooks->dynamicCall("Close()");
+    delete excel;
+    qDebug()<<QString/*::fromLocal8Bit*/("合并结束！");
+}
+
 void Widget::initHash()
 {
     QString symbol[] = {"A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z","AA","AB","AC","AD","AE","AF","AG","AH","AI","AJ","AK","AL","AM","AN","AO","AP","AQ","AR","AS","AT","AU","AV","AW","AX","AY","AZ"};
@@ -687,13 +1031,13 @@ bool Widget::checkInput()
 {
     if (m_inFile.isEmpty())
     {
-        QMessageBox::warning(this, QString/*::fromLocal8Bit*/("警告"), QString::fromLocal8Bit("请选择文件！"), QMessageBox::Ok);
+        QMessageBox::warning(this, QString/*::fromLocal8Bit*/("警告"), QString/*::fromLocal8Bit*/("请选择文件！"), QMessageBox::Ok);
         return false;
     }
     QString outFile = ui->lineEdit_Out->text();
     if (outFile.isEmpty())
     {
-        QMessageBox::warning(this, QString/*::fromLocal8Bit*/("警告"), QString::fromLocal8Bit("请指定输出文件名字！"), QMessageBox::Ok);
+        QMessageBox::warning(this, QString/*::fromLocal8Bit*/("警告"), QString/*::fromLocal8Bit*/("请指定输出文件名字！"), QMessageBox::Ok);
         return false;
     }
     QString filterColumn = ui->lineEdit_SortColumn->text();
@@ -702,12 +1046,12 @@ bool Widget::checkInput()
     dataColumn.replace("；",";");
     if (!filterColumn.contains(";"))
     {
-        QMessageBox::warning(this, QString/*::fromLocal8Bit*/("警告"), QString::fromLocal8Bit("请填写匹配列！"), QMessageBox::Ok);
+        QMessageBox::warning(this, QString/*::fromLocal8Bit*/("警告"), QString/*::fromLocal8Bit*/("请填写匹配列！"), QMessageBox::Ok);
         return false;
     }
     if (!dataColumn.contains(";"))
     {
-        QMessageBox::warning(this, QString/*::fromLocal8Bit*/("警告"), QString::fromLocal8Bit("请填写数据列！"), QMessageBox::Ok);
+        QMessageBox::warning(this, QString/*::fromLocal8Bit*/("警告"), QString/*::fromLocal8Bit*/("请填写数据列！"), QMessageBox::Ok);
         return false;
     }
     QStringList filtList = filterColumn.split(";");
@@ -744,14 +1088,14 @@ bool Widget::checkSplit()
 {
     if (m_inSplitFile.isEmpty())
     {
-        QMessageBox::warning(this, QString/*::fromLocal8Bit*/("警告"), QString::fromLocal8Bit("请选择文件！"), QMessageBox::Ok);
+        QMessageBox::warning(this, QString/*::fromLocal8Bit*/("警告"), QString/*::fromLocal8Bit*/("请选择文件！"), QMessageBox::Ok);
         return false;
     }
 
     QString splitSymbol = ui->lineEdit_Split->text();
     if (splitSymbol.isEmpty())
     {
-        QMessageBox::warning(this, QString/*::fromLocal8Bit*/("警告"), QString::fromLocal8Bit("请填写分隔符！"), QMessageBox::Ok);
+        QMessageBox::warning(this, QString/*::fromLocal8Bit*/("警告"), QString/*::fromLocal8Bit*/("请填写分隔符！"), QMessageBox::Ok);
         return false;
     }
     m_splitSymbol = splitSymbol;
@@ -760,7 +1104,7 @@ bool Widget::checkSplit()
     folderColumn.replace("；",";");
     if (!folderColumn.contains(";"))
     {
-        QMessageBox::warning(this, QString/*::fromLocal8Bit*/("警告"), QString::fromLocal8Bit("请填写文件夹匹配列！"), QMessageBox::Ok);
+        QMessageBox::warning(this, QString/*::fromLocal8Bit*/("警告"), QString/*::fromLocal8Bit*/("请填写文件夹匹配列！"), QMessageBox::Ok);
         return false;
     }
 
@@ -768,7 +1112,7 @@ bool Widget::checkSplit()
     tableColumn.replace("；",";");
     if (!tableColumn.contains(";"))
     {
-        QMessageBox::warning(this, QString/*::fromLocal8Bit*/("警告"), QString::fromLocal8Bit("请填写表匹配列！"), QMessageBox::Ok);
+        QMessageBox::warning(this, QString/*::fromLocal8Bit*/("警告"), QString/*::fromLocal8Bit*/("请填写表匹配列！"), QMessageBox::Ok);
         return false;
     }
 
@@ -807,14 +1151,14 @@ bool Widget::checkCompare()
 {
     if (m_inSplitFile.isEmpty())
     {
-        QMessageBox::warning(this, QString/*::fromLocal8Bit*/("警告"), QString::fromLocal8Bit("请选择文件！"), QMessageBox::Ok);
+        QMessageBox::warning(this, QString/*::fromLocal8Bit*/("警告"), QString/*::fromLocal8Bit*/("请选择文件！"), QMessageBox::Ok);
         return false;
     }
 
     QString splitSymbol = ui->lineEdit_Split->text();
     if (splitSymbol.isEmpty())
     {
-        QMessageBox::warning(this, QString/*::fromLocal8Bit*/("警告"), QString::fromLocal8Bit("请填写分隔符！"), QMessageBox::Ok);
+        QMessageBox::warning(this, QString/*::fromLocal8Bit*/("警告"), QString/*::fromLocal8Bit*/("请填写分隔符！"), QMessageBox::Ok);
         return false;
     }
     m_splitSymbol = splitSymbol;
@@ -823,7 +1167,7 @@ bool Widget::checkCompare()
     folderColumn.replace("；",";");
     if (!folderColumn.contains(";"))
     {
-        QMessageBox::warning(this, QString/*::fromLocal8Bit*/("警告"), QString::fromLocal8Bit("请填写文件夹匹配列！"), QMessageBox::Ok);
+        QMessageBox::warning(this, QString/*::fromLocal8Bit*/("警告"), QString/*::fromLocal8Bit*/("请填写文件夹匹配列！"), QMessageBox::Ok);
         return false;
     }
 
@@ -831,7 +1175,7 @@ bool Widget::checkCompare()
     tableColumn.replace("；",";");
     if (!tableColumn.contains(";"))
     {
-        QMessageBox::warning(this, QString/*::fromLocal8Bit*/("警告"), QString::fromLocal8Bit("请填写表匹配列！"), QMessageBox::Ok);
+        QMessageBox::warning(this, QString/*::fromLocal8Bit*/("警告"), QString/*::fromLocal8Bit*/("请填写表匹配列！"), QMessageBox::Ok);
         return false;
     }
 
@@ -864,6 +1208,30 @@ bool Widget::checkCompare()
         g_dataList.push_back(ite.value());
     }
     return true;
+}
+
+void Widget::convertMuch(QString &str)
+{
+    while (str.indexOf(",\"") != -1 && str.indexOf("\",") != -1)
+    {
+        int index1 = str.indexOf(",\"");
+        int index2 = str.indexOf("\",");
+        int index = str.indexOf(",", index1+1);
+        if (index > index2)
+        {
+            //没有逗号
+            str = str.remove(index2, 1);
+            str = str.remove(index1 + 1, 1);
+        }
+        else
+        {
+            //有逗号
+            str = str.remove(index2, 1);
+            str = str.remove(index, 1);
+            str = str.remove(index1 + 1, 1);
+        }
+    }
+
 }
 
 
