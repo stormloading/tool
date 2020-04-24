@@ -27,6 +27,9 @@ struct SData
 
     bool isChecked;
 
+    //match
+    bool isAbsolute;
+
     bool operator == (const SData other) const
     {
         for (int i=0; i < g_keyList.size(); i++)
@@ -125,6 +128,17 @@ struct SCompare
     QList<SData> list;
 };
 
+struct SMatch
+{
+    QList<int> inTimeList;
+    QList<int> muchList;
+    int minInTime;
+    int NameColNum;
+    int payColNum;
+    int maxCol;
+};
+
+
 class Widget : public QWidget
 {
     Q_OBJECT
@@ -146,6 +160,12 @@ public slots:
 
     void onTest();
 
+
+    //匹配
+    void onSelectMatchFile();
+    void onMatch();
+    void onMatch1();
+
 private:
     void initHash();
     bool checkInput();
@@ -155,7 +175,12 @@ private:
 
     bool checkCompare();
 
+    void rescMatch(SMatch m, QList<SData> &list);
+
     void convertMuch(QString &str);
+
+    bool getColList(QString cols, QList<int> &list);
+    bool getCol(QString col, int &colNum);
 
 private:
     Ui::Widget *ui;
