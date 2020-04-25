@@ -551,7 +551,7 @@
                  <item>
                   <widget class="QLineEdit" name="lineEdit_FileNameMatch">
                    <property name="text">
-                    <string>C:/Users/storm/Desktop/test/300合并处理0423.csv</string>
+                    <string>G:/tool/300合并处理0423.csv</string>
                    </property>
                    <property name="readOnly">
                     <bool>true</bool>

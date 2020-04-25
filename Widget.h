@@ -29,6 +29,7 @@ struct SData
 
     //match
     bool isAbsolute;
+    bool canDel;
 
     bool operator == (const SData other) const
     {
