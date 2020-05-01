@@ -551,7 +551,7 @@
                  <item>
                   <widget class="QLineEdit" name="lineEdit_FileNameMatch">
                    <property name="text">
-                    <string>G:/tool/300合并处理0423.csv</string>
+                    <string>C:/Users/storm/Desktop/test/300合并处理0423 - 副本1.csv</string>
                    </property>
                    <property name="readOnly">
                     <bool>true</bool>
@@ -677,6 +677,20 @@
                     <widget class="QLineEdit" name="lineEdit_PayMatch">
                      <property name="text">
                       <string>AJ</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QLabel" name="label_22">
+                     <property name="text">
+                      <string>匹配层级</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QLineEdit" name="lineEdit_Level">
+                     <property name="text">
+                      <string>5</string>
                      </property>
                     </widget>
                    </item>

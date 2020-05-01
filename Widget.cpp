@@ -4,8 +4,6 @@
 
 QList<int> g_keyList;
 QList<int> g_dataList;
-int g_tmpCount = 0;
-QList<SData> g_tmpData;
 QHash<QString, int> g_hashColumn;
 Widget::Widget(QWidget *parent)
     : QWidget(parent)
@@ -1034,7 +1032,7 @@ void Widget::onSelectMatchFile()
     ui->lineEdit_FileNameMatch->setText(matchFile);
 }
 #define TimeFormate "yyyy-MM-dd"
-
+#include <QThreadPool>
 void Widget::onMatch()
 {
     QString matchFile = ui->lineEdit_FileNameMatch->text();
@@ -1114,6 +1112,7 @@ void Widget::onMatch()
     m.payColNum = payColNum;
     m.NameColNum = NameColNum;
     m.inTimeList = inTimeList;
+    m.maxLevel = ui->lineEdit_Level->text().toUInt();
     g_keyList.clear();
     g_keyList.push_back(NameColNum);
     g_keyList.push_back(muchList.at(1));
@@ -1179,6 +1178,7 @@ void Widget::onMatch()
     }
 
     QMap<QString, QList<SData> >::iterator ite = splitData.begin();
+    QThreadPool::globalInstance()->setMaxThreadCount(4);
     for ( ; ite != splitData.end(); ite++)
     {
         rescMatch(m, ite.value());
@@ -1257,7 +1257,12 @@ void Widget::onMatch()
 //    }
 
     file.close();
-    qDebug()<<"done!"<<delCount<<saveCount<<g_tmpCount;;
+    qDebug()<<"done!";
+}
+
+void Widget::onOrderCheck()
+{
+
 }
 
 
@@ -1831,11 +1836,108 @@ bool Widget::checkCompare()
     return true;
 }
 
-#define MaxCount 5
+void Widget::orderMisMatch(SMatch m, QList<SData> &list)
+{
+    QList<int> sortList;
+    for (int i=0; i < list.size(); i++)
+    {
+        float v1 = list.at(i).list.at(m.inTimeList.at(1)-1).toFloat();
+        float v2 = list.at(i).list.at(m.inTimeList.at(2)-1).toFloat();
+        if (v1 != 0 && v2 != 0)
+        {
+            float v3 = v1/v2;
+            if (matchSCal(v3))
+            {
+
+            }
+            else
+            {
+                sortList.push_back(i);
+            }
+        }
+        if (list.at(i).isChecked)
+        {
+            continue;
+        }
+        bool absoluteMatch = true;
+        QDate baseDate = QDate::fromString(list.at(i).list.at(0), TimeFormate);
+        for (int j=0; j < m.inTimeList.size(); j++)
+        {
+            if (list.at(i).list.at(m.inTimeList.at(j)).isEmpty())
+            {
+                absoluteMatch = false;
+//                listRandom.push_back(QStringList()<<list.at(i).list.at(j-1)
+//                                     <<list.at(i).list.at(j)
+//                                     <<list.at(i).list.at(j+1)
+//                                     <<list.at(i).list.at(j+2));
+                break;
+            }
+
+            QDate Date = QDate::fromString(list.at(i).list.at(m.inTimeList.at(j)), TimeFormate);
+            if (qAbs(Date.daysTo(baseDate)) > 7)
+            {
+                absoluteMatch = false;
+                qDebug()<<QString/*::fromLocal8Bit*/("行%1入账日期间隔超过一周,怀疑错行.").arg(list.at(i).row+1);
+                break;
+            }
+        }
+        list[i].isAbsolute = absoluteMatch;
+    }
+
+    for (int i=0; i < sortList.size(); i++)
+    {
+        for (int j=0; j < sortList.size(); j++)
+        {
+            if (i == j)
+            {
+                continue;
+            }
+            if (list.at(sortList.at(j)).list.at(m.inTimeList.at(1)) ==
+                    list.at(sortList.at(i)).list.at(m.inTimeList.at(1)))
+            {
+                //比例符合就调换
+                float v1 = list.at(sortList.at(i)).list.at(m.inTimeList.at(1)-1).toFloat();
+                float v2 = list.at(sortList.at(j)).list.at(m.inTimeList.at(2)-1).toFloat();
+                float v3 = v1/v2;
+                if (matchSCal(v3))
+                {
+                    QString val = list.at(sortList.at(i)).list.at(m.inTimeList.at(2)-1);
+                    list[sortList.at(i)].list[m.inTimeList.at(2)-1] = list.at(sortList.at(j)).list.at(m.inTimeList.at(2)-1);
+                    list[sortList.at(j)].list[m.inTimeList.at(2)-1] = val;
+                    //重新计算AC列的和
+                    float vv1 = list.at(sortList.at(i)).list.at(m.inTimeList.at(0)-1).toFloat();
+                    float vv2 = list.at(sortList.at(i)).list.at(m.inTimeList.at(1)-1).toFloat();
+                    float vv3 = list.at(sortList.at(i)).list.at(m.inTimeList.at(2)-1).toFloat();
+                    list[sortList.at(i)].list[m.muchList.at(0)] = QString::number(vv1 + vv2 + vv3);
+
+                    vv1 = list.at(sortList.at(j)).list.at(m.inTimeList.at(0)-1).toFloat();
+                    vv2 = list.at(sortList.at(j)).list.at(m.inTimeList.at(1)-1).toFloat();
+                    vv3 = list.at(sortList.at(j)).list.at(m.inTimeList.at(2)-1).toFloat();
+                    list[sortList.at(j)].list[m.muchList.at(0)] = QString::number(vv1 + vv2 + vv3);
+                    qDebug()<<QString("行%1和行%2符合错行,调换.").arg(list.at(sortList.at(i)).row+1).arg(list.at(sortList.at(j)).row+1);
+                }
+            }
+        }
+    }
+}
+
+bool Widget::matchSCal(float v)
+{
+    if ((v > 1.049 && v < 1.051)
+            || (v > 0.799 && v < 0.801)
+            || (v > 0.9249 && v < 0.9251)
+            || (v > 1.679 && v < 1.681)
+            || (v > 0.449 && v < 0.451))
+    {
+        return true;
+    }
+        return false;
+}
+
 class CIndex
 {
 public:
-    CIndex(QList<SData> &list, QList<int> muchCol, QList<int> inTimeList);
+    CIndex(int resclevel, QList<SData> &list, QList<int> muchCol, QList<int> inTimeList);
     ~CIndex();
     bool add();
     float sum();
@@ -1844,8 +1946,9 @@ public:
     void setChecked();
     void orderData();
     bool hasTmpData(int matchIndex);
-    QList<SData> getTmpData();
+    QList<SData> getTmpData(int matchIndex);
     QString getLine();
+    QString getIndex();
     QString getTmpLine();
     SData &data();
 private:
@@ -1858,11 +1961,15 @@ private:
     int payCol;
     QList<int> inTime;
     int minCol;
+    int rowCount;//匹配到行数
+    int MaxCount;
 };
 
-CIndex::CIndex(QList<SData> &list, QList<int> muchCol, QList<int> inTimeList)
+CIndex::CIndex(int resclevel, QList<SData> &list, QList<int> muchCol, QList<int> inTimeList)
  : m_list(list)
 {
+    MaxCount = resclevel;
+    rowCount = 0;
     curCount = 1;
     col = muchCol.at(0);
     payCol = muchCol.at(1);
@@ -1957,6 +2064,7 @@ void CIndex::setChecked()
 
 void CIndex::orderData()
 {
+    qDebug()<<QString/*::fromLocal8Bit*/("匹配到数据,index %1-%2").arg(getIndex()).arg(getLine());
     QList<SData> data;
     //排序
     QList<int> BitToSmall;
@@ -1978,7 +2086,7 @@ void CIndex::orderData()
             }
             else if (BitToSmall.at(j) > index[i] && BitToSmall.at(j+1) < index[i])
             {
-                BitToSmall.insert(index[i], j+1);
+                BitToSmall.insert(j+1, index[i]);
                 break;
             }
         }
@@ -1996,21 +2104,21 @@ void CIndex::orderData()
     {
         m_list.insert(i, data.at(i));
     }
+    rowCount += BitToSmall.size();
+
     //重置index;
     for (int i=0; i < MaxCount; i++)
     {
-        index[i] = 0;
+        index[i] = rowCount;
     }
+    qDebug()<<QString/*::fromLocal8Bit*/("匹配到数据,从index %1-%2开始匹配").arg(getIndex()).arg(getLine());
 }
 
 bool CIndex::hasTmpData(int matchIndex)
 {
-    for (int i=0; i < curCount; i++)
+    if (index[0] == matchIndex)
     {
-        if (index[i] == matchIndex)
-        {
-            return false;
-        }
+        return false;
     }
     for (int i=0; i < curCount; i++)
     {
@@ -2022,12 +2130,12 @@ bool CIndex::hasTmpData(int matchIndex)
     return false;
 }
 
-QList<SData> CIndex::getTmpData()
+QList<SData> CIndex::getTmpData(int matchIndex)
 {
     QList<SData> ret;
     for (int i=0; i < curCount; i++)
     {
-        if (!m_list[index[i]].list.at(payCol).isEmpty())
+        if (index[i]!=matchIndex && !m_list[index[i]].list.at(payCol).isEmpty())
         {
             SData tmp = m_list[index[i]];
             for (int n=minCol-1; n < payCol; n++)
@@ -2037,6 +2145,10 @@ QList<SData> CIndex::getTmpData()
             tmp.isChecked = false;
             tmp.list.last().replace("\r", "");
             tmp.list.push_back(QString/*::fromLocal8Bit*/("临时列"));
+            if (i != 0)
+            {
+                m_list[index[i]].list[payCol] = "";
+            }
             ret.push_back(tmp);
         }
     }
@@ -2057,6 +2169,20 @@ QString CIndex::getLine()
             qDebug()<<QString/*::fromLocal8Bit*/("匹配到多于6项！！！！！！！！！！！！！！！！！！！！！");
         }
         ret += QString::number(m_list.at(index[i]).row+1);
+    }
+    return ret;
+}
+
+QString CIndex::getIndex()
+{
+    QString ret;
+    for (int i=0; i < curCount; i++)
+    {
+        if (i > 0)
+        {
+            ret += ",";
+        }
+        ret += QString::number(index[i]);
     }
     return ret;
 }
@@ -2106,6 +2232,10 @@ bool CIndex::addOne()
 //        index[i] = 0;
 //        index[i+1]++;
 //    }
+    if (curCount > m_list.size())
+    {
+        return false;
+    }
     int i=0;
     while((++index[i]) == m_list.size())
     {
@@ -2184,50 +2314,16 @@ bool CIndex::check()
 
 void Widget::rescMatch(const SMatch m, QList<SData> &list)
 {
-    for (int i=0; i < list.size(); i++)
-    {
-        if (list.at(i).isChecked)
-        {
-            continue;
-        }
-        bool absoluteMatch = true;
-        QDate baseDate = QDate::fromString(list.at(i).list.at(0), TimeFormate);
-        for (int j=0; j < m.inTimeList.size(); j++)
-        {
-            if (list.at(i).list.at(j).isEmpty())
-            {
-                absoluteMatch = false;
-                break;
-            }
+    orderMisMatch(m, list);
+    matchOtherLine(m, list);
 
-            QDate Date = QDate::fromString(list.at(i).list.at(j), TimeFormate);
-            if (qAbs(Date.daysTo(baseDate)) > 7)
-            {
-                absoluteMatch = false;
-                qDebug()<<QString/*::fromLocal8Bit*/("行%1入账日期间隔超过一周,怀疑错行.").arg(list.at(i).row+1);
-                break;
-            }
-            float v1 = list.at(i).list.at(m.inTimeList.at(1)).toFloat();
-            float v2 = list.at(i).list.at(m.inTimeList.at(2)).toFloat();
-            float v3 = v1/v2;
-            if (v3 == 1.05 || v3 == 0.8 || v3 == 0.925 || v3 == 1.68)
-            {
-
-            }
-            else
-            {
-//                absoluteMatch = false;
-//                qDebug()<<QString/*::fromLocal8Bit*/("行%1比值不对,错行.").arg(list.at(i).row+1);
-//                break;
-            }
-        }
-        list[i].isAbsolute = absoluteMatch;
-    }
     //匹配金额列直接对应（多行相加对应）
 
-    CIndex cindex(list, m.muchList, m.inTimeList);
+    CIndex cindex(m.maxLevel, list, m.muchList, m.inTimeList);
+    qDebug()<<QString("开始匹配 %1,共有%2行").arg(list.at(0).list.at(0)).arg(list.size());
     while(cindex.add())
     {
+//        qDebug()<<QString("匹配行:%1-%2").arg(cindex.getIndex()).arg(cindex.getLine());
         for (int j=0; j < list.size(); j++)
         {
             if (list.at(j).isChecked)
@@ -2240,9 +2336,13 @@ void Widget::rescMatch(const SMatch m, QList<SData> &list)
                 continue;
             }
             float val = cindex.sum() + list.at(j).list.at(m.muchList.at(1)).toFloat();
-            if (qAbs(val) > 0.000001)//判断是否存在金额一样的
+            if (qAbs(val) > 0.001)//判断是否存在金额一样的
             {
                 continue;
+            }
+            if (list.at(j).row == 702)
+            {
+                int a = 0;
             }
 
             int index = j+1;
@@ -2271,14 +2371,11 @@ void Widget::rescMatch(const SMatch m, QList<SData> &list)
 
             //procMatchData(m, );
             cindex.setChecked();
-            list[matchIndex].isChecked = true;
             //判断是否会覆盖数据
             if (cindex.hasTmpData(matchIndex))
             {
                 //保存临时数据
-                list.append(cindex.getTmpData());//直接加入循环
-                g_tmpCount++;
-                g_tmpData.append(cindex.getTmpData());
+                list.append(cindex.getTmpData(matchIndex));//直接加入循环
                 QString info = QString/*::fromLocal8Bit*/("匹配到付款数据,但源数据付款栏非空。行%1.").arg(cindex.getTmpLine());
                 qDebug()<<info;
 //                        ui->textEdit_Match->append(info);
@@ -2310,6 +2407,7 @@ void Widget::rescMatch(const SMatch m, QList<SData> &list)
 //                            qDebug()<<QString/*::fromLocal8Bit*/("行%1入账时间为空，删除。").arg(listData.at(j).row+1);;
 //                hashDel.insert(matchIndex, matchIndex);
                 list[matchIndex].canDel = true;
+                list[matchIndex].isChecked = true;
             }
             else
             {
@@ -2322,6 +2420,122 @@ void Widget::rescMatch(const SMatch m, QList<SData> &list)
     }
 
     //剩余数据匹配
+
+}
+
+void Widget::matchOtherLine(SMatch m, QList<SData> &list)
+{
+    for (int i=0; i < list.size(); i++)
+    {
+        if (list.at(i).isChecked)
+        {
+            continue;
+        }
+        if (list.at(i).isAbsolute)
+        {
+            continue;
+        }
+        for (int j=0; j < list.size(); j++)
+        {
+            if (list.at(j).isChecked)
+            {
+                continue;
+            }
+            if (i == j)
+            {
+                continue;//是否存在bc列在一行的情况?
+            }
+            if (list.at(i).list.at(m.inTimeList.at(1)-1).isEmpty() || list.at(j).list.at(m.inTimeList.at(2)-1).isEmpty())
+            {
+                continue;
+            }
+            //比例符合就调换
+            float v1 = list.at(i).list.at(m.inTimeList.at(1)-1).toFloat();
+            float v2 = list.at(j).list.at(m.inTimeList.at(2)-1).toFloat();
+
+            float v3 = v1/v2;
+            if (matchSCal(v3))
+            {
+                QDate date2 = QDate::fromString(list.at(i).list.at(m.inTimeList.at(1)), TimeFormate);
+                QDate date3 = QDate::fromString(list.at(j).list.at(m.inTimeList.at(2)), TimeFormate);
+                if (qAbs(date2.daysTo(date3)) < 7)
+                {
+                    qDebug()<<QString("行%1和行%2符合比例关系,合并.").arg(list.at(i).row+1).arg(list.at(j).row+1);
+                    assert(!list.at(i).list.at(m.inTimeList.at(2)).isEmpty());
+                    list[i].list[m.inTimeList.at(2)] = list.at(j).list.at(m.inTimeList.at(2));
+                    float vv1 = list.at(i).list.at(m.inTimeList.at(0)-1).toFloat();
+                    float vv2 = list.at(i).list.at(m.inTimeList.at(1)-1).toFloat();
+                    float vv3 = list.at(i).list.at(m.inTimeList.at(2)-1).toFloat();
+                    list[i].list[m.muchList.at(0)] = QString::number(vv1 + vv2 + vv3);
+
+                    list[j].list[m.inTimeList.at(2)] = "";
+                    vv1 = list.at(j).list.at(m.inTimeList.at(0)-1).toFloat();
+                    vv2 = list.at(j).list.at(m.inTimeList.at(1)-1).toFloat();
+                    vv3 = list.at(j).list.at(m.inTimeList.at(2)-1).toFloat();
+                    list[j].list[m.muchList.at(0)] = QString::number(vv1 + vv2 + vv3);
+                    if (list.at(j).list.at(m.inTimeList.at(0)).isEmpty() &&
+                            list.at(j).list.at(m.inTimeList.at(1)).isEmpty() &&
+                            list.at(j).list.at(m.inTimeList.at(2)).isEmpty() &&
+                            list.at(j).list.at(m.payColNum).isEmpty())
+                    {
+                        list[j].isChecked = true;
+                        list[j].canDel = true;
+                    }
+                    QList<int> listInTime1;
+                    for (int k=0; k < list.size(); k++)
+                    {
+                        if (list.at(k).isChecked)
+                        {
+                            continue;
+                        }
+                        QDate date1 = QDate::fromString(list.at(k).list.at(m.inTimeList.at(0)), TimeFormate);
+                        if (date1 == date2 || date1 == date3)
+                        {
+                            listInTime1.push_back(k);
+                        }
+                    }
+                    if (listInTime1.size() == 1)
+                    {
+                        qDebug()<<QString("行%1和行%2-%3日期相同且只有一个,合并.").arg(list.at(listInTime1.at(0)).row+1).arg(list.at(i).row+1).arg(list.at(j).row+1);
+                        if (listInTime1.at(0) == i)
+                        {
+                            //同一行 不处理
+                        }
+                        else
+                        {
+                            if (!list.at(i).list.at(m.inTimeList.at(0)).isEmpty())
+                            {
+                                SData data = list.at(i);
+                                for (int i=m.inTimeList.at(1)-1; i < data.list.size(); i++)
+                                {
+                                    data.list[i] = "";
+                                    data.list[m.muchList.at(0)] = list.at(i).list.at(m.inTimeList.at(0));
+                                    list.push_back(data);
+                                }
+                            }
+                            list[i].list[m.inTimeList.at(0)] = list.at(listInTime1.at(0)).list.at(m.inTimeList.at(0));
+                            vv1 = list.at(i).list.at(m.inTimeList.at(0)-1).toFloat();
+                            vv2 = list.at(i).list.at(m.inTimeList.at(1)-1).toFloat();
+                            vv3 = list.at(i).list.at(m.inTimeList.at(2)-1).toFloat();
+                            list[i].list[m.muchList.at(0)] = QString::number(vv1 + vv2 + vv3);
+
+                            list[listInTime1.at(0)].list[m.inTimeList.at(0)] = "";
+                            vv1 = list.at(listInTime1.at(0)).list.at(m.inTimeList.at(0)-1).toFloat();
+                            vv2 = list.at(listInTime1.at(0)).list.at(m.inTimeList.at(1)-1).toFloat();
+                            vv3 = list.at(listInTime1.at(0)).list.at(m.inTimeList.at(2)-1).toFloat();
+                            list[listInTime1.at(0)].list[m.muchList.at(0)] = QString::number(vv1 + vv2 + vv3);
+
+                        }
+                    }
+                    else
+                    {
+                        qDebug()<<QString("--------------------发现多个同一日期的M列,无法处理!");
+                        ui->textEdit_Match->append(QString("发现多个同一日期的M列,无法处理!"));
+                    }
+                }
+            }
+        }
+    }
 }
 
 void Widget::convertMuch(QString &str)
@@ -2427,4 +2641,15 @@ void CheckThread::onBegin()
         qDebug()<<"check"<<i;
     }
     m_locker.lockForRead();
+}
+
+matchTask::matchTask(SMatch m, QList<SData> &list, Widget *p)
+    : m_m(m), m_list(list), m_p(p)
+{
+
+}
+
+void matchTask::run()
+{
+    m_p->rescMatch(m_m, m_list);
 }

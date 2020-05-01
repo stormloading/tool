@@ -133,6 +133,7 @@ struct SMatch
 {
     QList<int> inTimeList;
     QList<int> muchList;
+    int maxLevel;
     int minInTime;
     int NameColNum;
     int payColNum;
@@ -143,7 +144,7 @@ struct SMatch
 class Widget : public QWidget
 {
     Q_OBJECT
-
+friend class matchTask;
 public:
     Widget(QWidget *parent = nullptr);
     ~Widget();
@@ -165,6 +166,7 @@ public slots:
     //匹配
     void onSelectMatchFile();
     void onMatch();
+    void onOrderCheck();
     void onMatch1();
 
 private:
@@ -176,7 +178,10 @@ private:
 
     bool checkCompare();
 
+    void orderMisMatch(SMatch m, QList<SData> &list);
+    bool matchSCal(float v);
     void rescMatch(SMatch m, QList<SData> &list);
+    void matchOtherLine(SMatch m, QList<SData> &list);
 
     void convertMuch(QString &str);
 
@@ -193,6 +198,18 @@ private:
 
     QString m_file1;
     QString m_file2;
+};
+#include <QRunnable>
+class matchTask : public QRunnable
+{
+    Q_OBJECT
+public:
+    matchTask(SMatch m, QList<SData> &list, Widget *p);
+    ~matchTask(){}
+    void run();
+    SMatch m_m;
+    QList<SData> &m_list;
+    Widget *m_p;
 };
 
 class CheckThread : public QThread
