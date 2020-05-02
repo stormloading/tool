@@ -1031,7 +1031,8 @@ void Widget::onSelectMatchFile()
     }
     ui->lineEdit_FileNameMatch->setText(matchFile);
 }
-#define TimeFormate "yyyy-MM-dd"
+#define TimeFormate "yyyy-M-d"
+#define TimeFormate2 "yyyy/M/d"
 #include <QThreadPool>
 void Widget::onMatch()
 {
@@ -1181,7 +1182,11 @@ void Widget::onMatch()
     QThreadPool::globalInstance()->setMaxThreadCount(4);
     for ( ; ite != splitData.end(); ite++)
     {
+        QDateTime time = QDateTime::currentDateTime();
+        qDebug()<<QString("开始匹配%1,时间%2").arg(ite.key()).arg(time.toString());
         rescMatch(m, ite.value());
+        QDateTime time2 = QDateTime::currentDateTime();
+        qDebug()<<QString("匹配结束%1,时间%2,耗时%3秒").arg(ite.key()).arg(time.toString()).arg(time.secsTo(time2));
     }
 
     //输出文件
@@ -2109,9 +2114,17 @@ void CIndex::orderData()
     //重置index;
     for (int i=0; i < MaxCount; i++)
     {
-        index[i] = rowCount;
+//        if (rowCount == m_list.size())
+//        {
+//            index[i] = rowCount-1;
+//        }
+//        else
+//        {
+//           index[i] = rowCount;
+//        }
+        index[i] = rowCount-1;
     }
-    qDebug()<<QString/*::fromLocal8Bit*/("匹配到数据,从index %1-%2开始匹配").arg(getIndex()).arg(getLine());
+    qDebug()<<QString/*::fromLocal8Bit*/("匹配到数据,从index %1开始匹配").arg(getIndex());
 }
 
 bool CIndex::hasTmpData(int matchIndex)
@@ -2441,6 +2454,10 @@ void Widget::matchOtherLine(SMatch m, QList<SData> &list)
             {
                 continue;
             }
+            if (list.at(j).isAbsolute)
+            {
+                continue;
+            }
             if (i == j)
             {
                 continue;//是否存在bc列在一行的情况?
@@ -2456,12 +2473,31 @@ void Widget::matchOtherLine(SMatch m, QList<SData> &list)
             float v3 = v1/v2;
             if (matchSCal(v3))
             {
-                QDate date2 = QDate::fromString(list.at(i).list.at(m.inTimeList.at(1)), TimeFormate);
-                QDate date3 = QDate::fromString(list.at(j).list.at(m.inTimeList.at(2)), TimeFormate);
+                QDate date2;
+                if (list.at(i).list.at(m.inTimeList.at(1)).contains("-"))
+                {
+                    date2 = QDate::fromString(list.at(i).list.at(m.inTimeList.at(1)), TimeFormate);
+                }
+                else
+                {
+                    date2 = QDate::fromString(list.at(i).list.at(m.inTimeList.at(1)), TimeFormate2);
+                }
+
+                QDate date3;
+                if (list.at(j).list.at(m.inTimeList.at(2)).contains("-"))
+                {
+                    date3 = QDate::fromString(list.at(j).list.at(m.inTimeList.at(2)), TimeFormate);
+                }
+                else
+                {
+                    date3 = QDate::fromString(list.at(j).list.at(m.inTimeList.at(2)), TimeFormate2);
+                }
+
                 if (qAbs(date2.daysTo(date3)) < 7)
                 {
-                    qDebug()<<QString("行%1和行%2符合比例关系,合并.").arg(list.at(i).row+1).arg(list.at(j).row+1);
-                    assert(!list.at(i).list.at(m.inTimeList.at(2)).isEmpty());
+                    qDebug()<<QString("行%1和行%2符合比例关系,合并.%3").arg(list.at(i).row+1).arg(list.at(j).row+1).arg(list.at(i).list.at(m.inTimeList.at(2)));
+                    ui->textEdit_Match->append(QString("行%1和行%2符合比例关系,合并.%3").arg(list.at(i).row+1).arg(list.at(j).row+1).arg(list.at(i).list.at(m.inTimeList.at(2))));
+                    assert(list.at(i).list.at(m.inTimeList.at(2)).isEmpty());
                     list[i].list[m.inTimeList.at(2)] = list.at(j).list.at(m.inTimeList.at(2));
                     float vv1 = list.at(i).list.at(m.inTimeList.at(0)-1).toFloat();
                     float vv2 = list.at(i).list.at(m.inTimeList.at(1)-1).toFloat();
@@ -2488,7 +2524,15 @@ void Widget::matchOtherLine(SMatch m, QList<SData> &list)
                         {
                             continue;
                         }
-                        QDate date1 = QDate::fromString(list.at(k).list.at(m.inTimeList.at(0)), TimeFormate);
+                        QDate date1;
+                        if (list.at(k).list.at(m.inTimeList.at(0)).contains("-"))
+                        {
+                            date1 = QDate::fromString(list.at(k).list.at(m.inTimeList.at(0)), TimeFormate);
+                        }
+                        else
+                        {
+                            date1 = QDate::fromString(list.at(k).list.at(m.inTimeList.at(0)), TimeFormate2);
+                        }
                         if (date1 == date2 || date1 == date3)
                         {
                             listInTime1.push_back(k);
@@ -2497,6 +2541,7 @@ void Widget::matchOtherLine(SMatch m, QList<SData> &list)
                     if (listInTime1.size() == 1)
                     {
                         qDebug()<<QString("行%1和行%2-%3日期相同且只有一个,合并.").arg(list.at(listInTime1.at(0)).row+1).arg(list.at(i).row+1).arg(list.at(j).row+1);
+                        ui->textEdit_Match->append(QString("行%1和行%2-%3日期相同且只有一个,合并.").arg(list.at(listInTime1.at(0)).row+1).arg(list.at(i).row+1).arg(list.at(j).row+1));
                         if (listInTime1.at(0) == i)
                         {
                             //同一行 不处理

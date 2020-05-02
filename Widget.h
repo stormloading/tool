@@ -202,7 +202,6 @@ private:
 #include <QRunnable>
 class matchTask : public QRunnable
 {
-    Q_OBJECT
 public:
     matchTask(SMatch m, QList<SData> &list, Widget *p);
     ~matchTask(){}
