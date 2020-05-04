@@ -227,6 +227,7 @@ void Widget::onProc()
                     {
                         qDebug()<<QString/*::fromLocal8Bit*/("重复：行%1和行%2，均有数据").arg(row+1).arg(data.row+1);
                         ui->textEdit->append(QString/*::fromLocal8Bit*/("重复：行%1和行%2，均有数据").arg(row+1).arg(data.row+1));
+                        listData.push_back(data);
                     }
                     else if (data.isEmpty() && !ite.key().isEmpty())
                     {
@@ -238,6 +239,7 @@ void Widget::onProc()
                         int index = listData.indexOf(data);
                         qDebug()<<QString/*::fromLocal8Bit*/("重复：行%1和行%2，前无数据，后有数据，删前者，追加").arg(row+1).arg(data.row+1);
                         listData.removeAt(index);
+                        listData.push_back(data);
                     }
                 }
                 else
@@ -245,7 +247,7 @@ void Widget::onProc()
                     hashData.insert(data, data.row);
                 }
             }
-            listData.push_back(data);
+//            listData.push_back(data);
         }
         else
         {
@@ -1951,7 +1953,7 @@ class CIndex
 public:
     CIndex(int resclevel, QList<SData> &list, QList<int> muchCol, QList<int> inTimeList);
     ~CIndex();
-    bool add();
+    virtual bool add();
     virtual float sum();
     virtual bool checkDate(QDate date);
     QDate baseTime();
@@ -1962,8 +1964,9 @@ public:
     QString getLine();
     QString getIndex();
     QString getTmpLine();
-    SData &data();
+    SData &data(int i);
     int getCurCount();
+    QList<int> getMatchIndex();
 protected:
     bool addOne();
     virtual bool check();
@@ -1983,16 +1986,17 @@ class CRIndex : public CIndex
 public:
     CRIndex(int resclevel, QList<SData> &list, QList<int> muchCol, QList<int> inTimeList);
     ~CRIndex();
+    bool add();
     float sum();
     bool checkDate(QDate date);
-    bool hasTmpData(int matchIndex);
-    QList<SData> getTmpData(int matchIndex);
+    bool hasTmpData(QList<int> matchIndex);
+    QList<SData> getTmpData(QList<int> matchIndex);
 //    QString getLine();
 //    QString getIndex();
 //    QString getTmpLine();
 //    SData &data();
-    int getCurIndex();
-    QList<int> getMatchIndex();
+    int getCurIndex(int i);
+//    QList<int> getMatchIndex();
 private:
     bool check();
 };
@@ -2156,49 +2160,57 @@ void CIndex::orderData()
 
 bool CIndex::hasTmpData(QList<int> matchIndex)
 {
-    if (curCount == 1)
-    {
-        if (matchIndex.size() == 1)
-        {
-            if (index[0] == matchIndex.at(0))
-            {
-                return false;
-            }
-        }
-        else
-        {
-            if (index[0] == matchIndex.at(0) || index[0] == matchIndex.at(1))
-            {
-                return false;
-            }
-        }
-    }
-    else
-    {
-        if (matchIndex.size() == 1)
-        {
-            if (index[0] == matchIndex.at(0))
-            {
-                return false;
-            }
-        }
-        else
-        {
-            if (matchIndex.contains(index[0]) && matchIndex.contains(index[1]))
-            {
-                return false;
-            }
-        }
-    }
-
     for (int i=0; i < curCount; i++)
     {
-        if (!m_list[index[i]].list.at(payCol).isEmpty())
+        if (!matchIndex.contains(index[i]) && !m_list[index[i]].list.at(payCol).isEmpty())
         {
             return true;
         }
     }
     return false;
+//    if (curCount == 1)
+//    {
+//        if (matchIndex.size() == 1)
+//        {
+//            if (index[0] == matchIndex.at(0))
+//            {
+//                return false;
+//            }
+//        }
+//        else
+//        {
+//            if (index[0] == matchIndex.at(0) || index[0] == matchIndex.at(1))
+//            {
+//                return false;
+//            }
+//        }
+//    }
+//    else
+//    {
+//        if (matchIndex.size() == 1)
+//        {
+//            if (index[0] == matchIndex.at(0))
+//            {
+//                return false;
+//            }
+//        }
+//        else
+//        {
+//            if (matchIndex.contains(index[0]) && matchIndex.contains(index[1]))
+//            {
+//                return false;
+//            }
+//        }
+//    }
+
+//    for (int i=0; i < curCount; i++)
+//    {
+//        if (!m_list[index[i]].list.at(payCol).isEmpty())
+//        {
+//            return true;
+//        }
+//    }
+//    return false;
 }
 
 QList<SData> CIndex::getTmpData(QList<int> matchIndex)
@@ -2206,7 +2218,7 @@ QList<SData> CIndex::getTmpData(QList<int> matchIndex)
     QList<SData> ret;
     for (int i=0; i < curCount; i++)
     {
-        if (index[i]!=matchIndex && !m_list[index[i]].list.at(payCol).isEmpty())
+        if (!matchIndex.contains(index[i]) && !m_list[index[i]].list.at(payCol).isEmpty())
         {
             SData tmp = m_list[index[i]];
             for (int n=minCol-1; n < payCol; n++)
@@ -2275,14 +2287,24 @@ QString CIndex::getTmpLine()
     return ret;
 }
 
-SData &CIndex::data()
+SData &CIndex::data(int i)
 {
-    return m_list[index[0]];
+    return m_list[index[i]];
 }
 
 int CIndex::getCurCount()
 {
     return curCount;
+}
+
+QList<int> CIndex::getMatchIndex()
+{
+    QList<int> ret;
+    for (int i=0; i < curCount; i++)
+    {
+        ret.push_back(index[i]);
+    }
+    return ret;
 }
 
 //QString CIndex::copyData(SData data)
@@ -2411,10 +2433,10 @@ void Widget::rescMatch(const SMatch m, QList<SData> &list)
 
             if (crindex.getCurCount() == 1)
             {
-                int index = crindex.getCurIndex()+1;
+                int index = crindex.getCurIndex(0);
                 QList<int> ununiqueList;
                 ununiqueList.push_back(index);
-                while (list.indexOf(list.at(index), index) != -1)
+                while (list.indexOf(list.at(index), index+1) != -1)
                 {
                     ununiqueList.push_back(index);
                     index++;
@@ -2433,86 +2455,27 @@ void Widget::rescMatch(const SMatch m, QList<SData> &list)
                             matchIndex = k;//匹配时间最近的
                         }
                     }
-
-                    cindex.setChecked();
-                    //判断是否会覆盖数据
-                    if (cindex.hasTmpData(matchIndex))
-                    {
-                        //保存临时数据
-                        list.append(cindex.getTmpData(matchIndex));//直接加入循环
-                        QString info = QString/*::fromLocal8Bit*/("匹配到付款数据,但源数据付款栏非空。行%1.").arg(cindex.getTmpLine());
-                        qDebug()<<info;
-                        //                        ui->textEdit_Match->append(info);
-                    }
-                    //挪数据
-                    for (int n=m.muchList.at(1); n < list.at(matchIndex).list.size(); n++)
-                    {
-                        if (n < cindex.data().list.size())
-                        {
-                            cindex.data().list[n] = list.at(matchIndex).list[n];
-                        }
-                    }
-                    //删除付款金额
-                    list[matchIndex].list[m.muchList.at(1)] = "";
-                    QString info = QString/*::fromLocal8Bit*/("行%1和行%2数据匹配成功！复制数据。").arg(cindex.getLine()).arg(list.at(matchIndex).row+1);
-                    qDebug()<<info;
-                    //是否删除行
-                    bool canDel = true;
-                    for (int n=0; n < m.inTimeList.size(); n++)
-                    {
-                        if (!list.at(matchIndex).list.at(m.inTimeList.at(n)).isEmpty())
-                        {
-                            canDel = false;
-                            break;
-                        }
-                    }
-                    if (canDel)
-                    {
-                        //                            qDebug()<<QString/*::fromLocal8Bit*/("行%1入账时间为空，删除。").arg(listData.at(j).row+1);;
-                        //                hashDel.insert(matchIndex, matchIndex);
-                        list[matchIndex].canDel = true;
-                        list[matchIndex].isChecked = true;
-                    }
-                    else
-                    {
-                        list[matchIndex].canDel = false;
-                        qDebug()<<QString/*::fromLocal8Bit*/("行%1入账时间非空，不删除。").arg(list.at(matchIndex).row+1);;
-                    }
-                    cindex.orderData();
-                    break;
                 }
-            }
-            else
-            {
                 cindex.setChecked();
                 //判断是否会覆盖数据
-                if (cindex.hasTmpData(crindex.getMatchIndex()) || crindex.hasTmpData(cindex.getMatchIndex()))
+                QList<int> matchList;
+                matchList.push_back(matchIndex);
+                if (cindex.hasTmpData(matchList))
                 {
                     //保存临时数据
-                    list.append(cindex.getTmpData(crindex.getMatchIndex()));//直接加入循环
-                    list.append(crindex.getTmpData(cindex.getMatchIndex()));
-    //                QString info = QString/*::fromLocal8Bit*/("匹配到付款数据,但源数据付款栏非空。行%1.").arg(cindex.getTmpLine());
-    //                qDebug()<<info;
-    //                        ui->textEdit_Match->append(info);
+                    list.append(cindex.getTmpData(matchList));//直接加入循环
+                    QString info = QString/*::fromLocal8Bit*/("匹配到付款数据,但源数据付款栏非空。行%1.").arg(cindex.getTmpLine());
+                    qDebug()<<info;
+                    //                        ui->textEdit_Match->append(info);
                 }
-
                 //挪数据
-                if (cindex.getCurCount() == 1)
+                for (int n=m.muchList.at(1); n < list.at(matchIndex).list.size(); n++)
                 {
-
-                }
-                else
-                {
-                    int index = crindex.getCurIndex()+1;
-                    for (int n=m.muchList.at(1); n < list.at(index).list.size(); n++)
+                    if (n < cindex.data(0).list.size())
                     {
-                        if (n < cindex.data().list.size())
-                        {
-                            cindex.data().list[n] = list.at(index).list[n];
-                        }
+                        cindex.data(0).list[n] = list.at(matchIndex).list[n];
                     }
                 }
-
                 //删除付款金额
                 list[matchIndex].list[m.muchList.at(1)] = "";
                 QString info = QString/*::fromLocal8Bit*/("行%1和行%2数据匹配成功！复制数据。").arg(cindex.getLine()).arg(list.at(matchIndex).row+1);
@@ -2529,8 +2492,8 @@ void Widget::rescMatch(const SMatch m, QList<SData> &list)
                 }
                 if (canDel)
                 {
-    //                            qDebug()<<QString/*::fromLocal8Bit*/("行%1入账时间为空，删除。").arg(listData.at(j).row+1);;
-    //                hashDel.insert(matchIndex, matchIndex);
+                    //                            qDebug()<<QString/*::fromLocal8Bit*/("行%1入账时间为空，删除。").arg(listData.at(j).row+1);;
+                    //                hashDel.insert(matchIndex, matchIndex);
                     list[matchIndex].canDel = true;
                     list[matchIndex].isChecked = true;
                 }
@@ -2540,6 +2503,109 @@ void Widget::rescMatch(const SMatch m, QList<SData> &list)
                     qDebug()<<QString/*::fromLocal8Bit*/("行%1入账时间非空，不删除。").arg(list.at(matchIndex).row+1);;
                 }
                 cindex.orderData();
+                break;
+            }
+            else
+            {
+                cindex.setChecked();
+                //判断是否会覆盖数据
+                if (cindex.hasTmpData(crindex.getMatchIndex()) || crindex.hasTmpData(cindex.getMatchIndex()))
+                {
+                    //保存临时数据
+                    list.append(cindex.getTmpData(crindex.getMatchIndex()));//直接加入循环
+                    list.append(crindex.getTmpData(cindex.getMatchIndex()));
+    //                QString info = QString/*::fromLocal8Bit*/("匹配到付款数据,但源数据付款栏非空。行%1.").arg(cindex.getTmpLine());
+    //                qDebug()<<info;
+    //                        ui->textEdit_Match->append(info);
+                }
+
+                //挪数据
+                QList<SData> ldata;
+                for (int n=0; n < crindex.getCurCount(); n++)
+                {
+                    ldata.push_back(crindex.data(n));
+                }
+                if (cindex.getCurCount() == 1)
+                {
+                    if (!crindex.getMatchIndex().contains(cindex.getMatchIndex().at(0)))
+                    {
+                        for (int n=m.muchList.at(1); n < ldata.at(0).list.size(); n++)
+                        {
+                            if (n < cindex.data(0).list.size())
+                            {
+                                cindex.data(0).list[n] = ldata.at(0).list[n];
+                                cindex.data(0).list[n].replace("\r", "");
+                            }
+                        }
+                        list[crindex.getCurIndex(0)].list[m.muchList.at(1)] = "";
+                        list[crindex.getCurIndex(0)].isChecked = true;
+                    }
+//                    qDebug()<<QString("1111111111111111111111111111111111111111111111111111111111");
+                }
+                else
+                {
+                    //删除付款金额
+                    for (int i=0; i < crindex.getCurCount(); i++)
+                    {
+                        list[crindex.getCurIndex(i)].list[m.muchList.at(1)] = "";
+                        list[crindex.getCurIndex(i)].isChecked = true;
+                        if (!cindex.getMatchIndex().contains(crindex.getCurIndex(i)))
+                        {
+                            list[crindex.getCurIndex(i)].canDel = true;
+                        }
+                    }
+                    for (int i=0; i < ldata.size(); i++)
+                    {
+                        for (int n=m.muchList.at(1); n < ldata.at(i).list.size(); n++)
+                        {
+                            if (n < cindex.data(i).list.size())
+                            {
+                                cindex.data(i).list[n] = ldata.at(i).list[n];
+                                cindex.data(i).list[n].replace("\r", "");
+                            }
+                        }
+                    }
+                }
+
+
+                QString info = QString/*::fromLocal8Bit*/("行%1和行%2数据匹配成功！复制数据。").arg(cindex.getLine()).arg(crindex.getLine());
+                qDebug()<<info;
+                //是否删除行
+
+//                for (int n=0; n < m.inTimeList.size(); n++)
+//                {
+//                    if (!list.at(matchIndex).list.at(m.inTimeList.at(n)).isEmpty())
+//                    {
+//                        canDel = false;
+//                        break;
+//                    }
+//                }
+//                if (canDel)
+//                {
+//    //                            qDebug()<<QString/*::fromLocal8Bit*/("行%1入账时间为空，删除。").arg(listData.at(j).row+1);;
+//    //                hashDel.insert(matchIndex, matchIndex);
+//                    list[matchIndex].canDel = true;
+//                    list[matchIndex].isChecked = true;
+//                }
+//                else
+//                {
+//                    list[matchIndex].canDel = false;
+//                    qDebug()<<QString/*::fromLocal8Bit*/("行%1入账时间非空，不删除。").arg(list.at(matchIndex).row+1);;
+//                }
+                cindex.orderData();
+                if (crindex.getCurCount() > cindex.getCurCount())
+                {
+                    list.insert(1, ldata.at(1));
+                    list[1].isChecked = true;
+                    for (int n=m.minInTime-1; n < m.muchList.at(0); n++)
+                    {
+                        if (n < list[1].list.size())
+                        {
+                            list[1].list[n] = "";
+                        }
+                    }
+                    qDebug()<<QString/*::fromLocal8Bit*/("付款多于账单----------%1-%2").arg(cindex.getTmpLine()).arg(crindex.getLine());
+                }
                 break;
             }
         }
@@ -2907,23 +2973,30 @@ void matchTask::run()
 }
 
 CRIndex::CRIndex(int resclevel, QList<SData> &list, QList<int> muchCol, QList<int> inTimeList)
+    : CIndex(resclevel, list, muchCol, inTimeList)
 {
     MaxCount = 2;
-    rowCount = 0;
-    curCount = 1;
-    col = muchCol.at(0);
-    payCol = muchCol.at(1);
-    inTime = inTimeList;
-    index = new int[MaxCount];
-    for (int i=0; i < MaxCount; i++)
+}
+
+CRIndex::~CRIndex()
+{
+
+}
+
+bool CRIndex::add()
+{
+    if (!addOne())
     {
-        index[i] = -1;
+        return false;
     }
-    minCol = inTimeList.at(0);
-    for (int i=1; i < inTimeList.size(); i++)
+    while (!CRIndex::check())
     {
-        minCol = minCol<inTimeList.at(i)?minCol:inTimeList.at(i);
+        if (!addOne())
+        {
+            return false;
+        }
     }
+    return true;
 }
 
 float CRIndex::sum()
@@ -2950,14 +3023,14 @@ bool CRIndex::checkDate(QDate date)
     return true;
 }
 
-bool CRIndex::hasTmpData(int matchIndex)
+bool CRIndex::hasTmpData(QList<int> matchIndex)
 {
-    if (index[0] == matchIndex)
-    {
-        return false;
-    }
     for (int i=0; i < curCount; i++)
     {
+        if (matchIndex.contains(index[i]))
+        {
+            continue;
+        }
         for (int j=0; j < inTime.size(); j++)
         {
             if (!m_list[index[i]].list.at(inTime.at(j)).isEmpty())
@@ -2969,19 +3042,50 @@ bool CRIndex::hasTmpData(int matchIndex)
     return false;
 }
 
-int CRIndex::getCurIndex()
+QList<SData> CRIndex::getTmpData(QList<int> matchIndex)
 {
-    return index[0];
-}
-
-QList<int> CRIndex::getMatchIndex()
-{
-    QList<int> ret;
+    QList<SData> ret;
     for (int i=0; i < curCount; i++)
     {
-        ret.push_back(index[i]);
+        bool allEmpty = true;
+        for (int j=0; j < inTime.size(); j++)
+        {
+            if (!matchIndex.contains(index[i]) && !m_list[index[i]].list.at(inTime.at(j)).isEmpty())
+            {
+                allEmpty = false;
+                break;
+            }
+        }
+        if (allEmpty)
+        {
+            continue;
+        }
+        SData tmp = m_list[index[i]];
+        for (int n=payCol-1; n < tmp.list.size(); n++)
+        {
+            tmp.list[n] = "";
+        }
+        tmp.isChecked = false;
+        tmp.list.last().replace("\r", "");
+        tmp.list.push_back(QString/*::fromLocal8Bit*/("临时列"));
+        ret.push_back(tmp);
     }
+    return ret;
 }
+
+int CRIndex::getCurIndex(int i)
+{
+    return index[i];
+}
+
+//QList<int> CRIndex::getMatchIndex()
+//{
+//    QList<int> ret;
+//    for (int i=0; i < curCount; i++)
+//    {
+//        ret.push_back(index[i]);
+//    }
+//}
 
 bool CRIndex::check()
 {
@@ -3013,7 +3117,8 @@ bool CRIndex::check()
     }
     for (int i=0; i < curCount; i++)
     {
-        if (m_list.at(index[i]).list.at(payCol).isEmpty())
+        if (m_list.at(index[i]).list.at(payCol).isEmpty()
+                || m_list.at(index[i]).list.at(payCol).contains("-"))
         {
             return false;
         }
