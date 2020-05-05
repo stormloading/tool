@@ -1998,6 +1998,7 @@ class CRIndex : public CIndex
 public:
     CRIndex(int resclevel, QList<SData> &list, QList<int> muchCol, QList<int> inTimeList);
     ~CRIndex();
+    void reset();
     bool add();
     float sum();
     bool checkDate(QDate date);
@@ -2155,7 +2156,7 @@ void CIndex::orderData()
     rowCount += BitToSmall.size();
 
     //重置index;
-    for (int i=0; i < MaxCount; i++)
+    for (int i=0; i < curCount; i++)
     {
 //        if (rowCount == m_list.size())
 //        {
@@ -2435,6 +2436,7 @@ void Widget::rescMatch(const SMatch m, QList<SData> &list)
     while(cindex.add())
     {
 //        qDebug()<<QString("匹配行:%1-%2").arg(cindex.getIndex()).arg(cindex.getLine());
+        crindex.reset();
         while (crindex.add())
         {
             float val = cindex.sum() + crindex.sum();
@@ -2806,7 +2808,10 @@ void Widget::matchOtherLine(SMatch m, QList<SData> &list)
                     qDebug()<<QString("行%1和行%2符合比例关系,合并.%3").arg(list.at(i).row+1).arg(list.at(j).row+1).arg(list.at(i).list.at(m.inTimeList.at(2)));
                     ui->textEdit_Match->append(QString("行%1和行%2符合比例关系,合并.%3").arg(list.at(i).row+1).arg(list.at(j).row+1).arg(list.at(i).list.at(m.inTimeList.at(2))));
                     assert(list.at(i).list.at(m.inTimeList.at(2)).isEmpty());
+                    list[i].list[m.inTimeList.at(2)-1] = list.at(j).list.at(m.inTimeList.at(2)-1);
                     list[i].list[m.inTimeList.at(2)] = list.at(j).list.at(m.inTimeList.at(2));
+                    list[i].list[m.inTimeList.at(2)+1] = list.at(j).list.at(m.inTimeList.at(2)+1);
+                    list[i].list[m.inTimeList.at(2)+2] = list.at(j).list.at(m.inTimeList.at(2)+2);
                     float vv1 = list.at(i).list.at(m.inTimeList.at(0)-1).toFloat();
                     float vv2 = list.at(i).list.at(m.inTimeList.at(1)-1).toFloat();
                     float vv3 = list.at(i).list.at(m.inTimeList.at(2)-1).toFloat();
@@ -2856,7 +2861,10 @@ void Widget::matchOtherLine(SMatch m, QList<SData> &list)
                         ui->textEdit_Match->append(QString("行%1和行%2-%3日期相同且只有一个,合并.").arg(list.at(listInTime1.at(0)).row+1).arg(list.at(i).row+1).arg(list.at(j).row+1));
                         if (listInTime1.at(0) == i)
                         {
-                            //同一行 不处理
+                            vv1 = list.at(i).list.at(m.inTimeList.at(0)-1).toFloat();
+                            vv2 = list.at(i).list.at(m.inTimeList.at(1)-1).toFloat();
+                            vv3 = list.at(i).list.at(m.inTimeList.at(2)-1).toFloat();
+                            list[i].list[m.muchList.at(0)] = QString::number(vv1 + vv2 + vv3);
                         }
                         else
                         {
@@ -2870,7 +2878,11 @@ void Widget::matchOtherLine(SMatch m, QList<SData> &list)
                                 data.list[m.muchList.at(0)] = list.at(i).list.at(m.inTimeList.at(0));
                                 list.push_back(data);
                             }
+                            list[i].list[m.inTimeList.at(0)-1] = list.at(listInTime1.at(0)).list.at(m.inTimeList.at(0)-1);
                             list[i].list[m.inTimeList.at(0)] = list.at(listInTime1.at(0)).list.at(m.inTimeList.at(0));
+                            list[i].list[m.inTimeList.at(0)+1] = list.at(listInTime1.at(0)).list.at(m.inTimeList.at(0)+1);
+                            list[i].list[m.inTimeList.at(0)+2] = list.at(listInTime1.at(0)).list.at(m.inTimeList.at(0)+2);
+//                            list[i].list[m.inTimeList.at(0)] = list.at(listInTime1.at(0)).list.at(m.inTimeList.at(0));
                             vv1 = list.at(i).list.at(m.inTimeList.at(0)-1).toFloat();
                             vv2 = list.at(i).list.at(m.inTimeList.at(1)-1).toFloat();
                             vv3 = list.at(i).list.at(m.inTimeList.at(2)-1).toFloat();
@@ -3026,6 +3038,15 @@ CRIndex::CRIndex(int resclevel, QList<SData> &list, QList<int> muchCol, QList<in
 CRIndex::~CRIndex()
 {
 
+}
+
+void CRIndex::reset()
+{
+    curCount = 1;
+    for (int i=0; i < 10; i++)
+    {
+        index[i] = 0;
+    }
 }
 
 bool CRIndex::add()
