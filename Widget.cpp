@@ -1184,19 +1184,19 @@ void Widget::onMatch()
     QThreadPool::globalInstance()->setMaxThreadCount(8);
     for ( ; ite != splitData.end(); ite++)
     {
-        QDateTime time = QDateTime::currentDateTime();
-        qDebug()<<QString("开始匹配%1,时间%2").arg(ite.key()).arg(time.toString());
-//        matchTask *task = new matchTask(m, ite.value(), this);
-//        QThreadPool::globalInstance()->start(task);
-        rescMatch(m, ite.value());
-        QDateTime time2 = QDateTime::currentDateTime();
-        qDebug()<<QString("匹配结束%1,时间%2,耗时%3秒").arg(ite.key()).arg(time.toString()).arg(time.secsTo(time2));
+//        QDateTime time = QDateTime::currentDateTime();
+//        qDebug()<<QString("开始匹配%1,时间%2").arg(ite.key()).arg(time.toString());
+        matchTask *task = new matchTask(m, ite.value(), this);
+        QThreadPool::globalInstance()->start(task);
+//        rescMatch(m, ite.value());
+//        QDateTime time2 = QDateTime::currentDateTime();
+//        qDebug()<<QString("匹配结束%1,时间%2,耗时%3秒").arg(ite.key()).arg(time.toString()).arg(time.secsTo(time2));
     }
-//    while (QThreadPool::globalInstance()->activeThreadCount() != 0)
-//    {
-//        QThread::msleep(1000);
-//        QApplication::processEvents();
-//    }
+    while (QThreadPool::globalInstance()->activeThreadCount() != 0)
+    {
+        QThread::msleep(1000);
+        QApplication::processEvents();
+    }
 
     //输出文件
     QFile out(outFile);
@@ -2538,7 +2538,30 @@ void Widget::rescMatch(const SMatch m, QList<SData> &list)
                             }
                         }
                         list[crindex.getCurIndex(0)].list[m.muchList.at(1)] = "";
-                        list[crindex.getCurIndex(0)].isChecked = true;
+                        for (int i = 0; i < crindex.getCurCount(); i++)
+                        {
+                            list[crindex.getCurIndex(i)].isChecked = true;
+                            list[crindex.getCurIndex(i)].canDel = true;
+                        }
+                    }
+                    else
+                    {
+                        int index = -1;
+                        for (int i = 0; i < crindex.getCurCount(); i++)
+                        {
+                            list[crindex.getCurIndex(i)].isChecked = true;
+                            if (crindex.getCurIndex(i) == cindex.getMatchIndex().at(0))
+                            {
+                                index = crindex.getCurIndex(i);
+                                list[crindex.getCurIndex(i)].canDel = false;
+                            }
+                            else
+                            {
+                                ldata.removeLast();
+                                ldata.push_back(list[crindex.getCurIndex(i)]);
+                                list[crindex.getCurIndex(i)].canDel = true;
+                            }
+                        }
                     }
 //                    qDebug()<<QString("1111111111111111111111111111111111111111111111111111111111");
                 }
@@ -3069,6 +3092,10 @@ QList<SData> CRIndex::getTmpData(QList<int> matchIndex)
         tmp.list.last().replace("\r", "");
         tmp.list.push_back(QString/*::fromLocal8Bit*/("临时列"));
         ret.push_back(tmp);
+        for (int n=minCol-1; n < payCol-1; n++)
+        {
+            m_list[index[i]].list[n] = "";
+        }
     }
     return ret;
 }
