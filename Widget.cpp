@@ -5,6 +5,8 @@
 QList<int> g_keyList;
 QList<int> g_dataList;
 QHash<QString, int> g_hashColumn;
+QList<QString> g_Task;
+QMutex g_mutex;
 Widget::Widget(QWidget *parent)
     : QWidget(parent)
     , ui(new Ui::Widget)
@@ -1182,19 +1184,29 @@ void Widget::onMatch()
 
     QMap<QString, QList<SData> >::iterator ite = splitData.begin();
     QThreadPool::globalInstance()->setMaxThreadCount(8);
-    for ( ; ite != splitData.end(); ite++)
+    for (int i=0; i < orderList.size(); i++)
     {
-//        QDateTime time = QDateTime::currentDateTime();
-//        qDebug()<<QString("开始匹配%1,时间%2").arg(ite.key()).arg(time.toString());
-        matchTask *task = new matchTask(m, ite.value(), this);
-        QThreadPool::globalInstance()->start(task);
-//        rescMatch(m, ite.value());
-//        QDateTime time2 = QDateTime::currentDateTime();
-//        qDebug()<<QString("匹配结束%1,时间%2,耗时%3秒").arg(ite.key()).arg(time.toString()).arg(time.secsTo(time2));
+        QMap<QString, QList<SData> >::iterator ite = splitData.find(orderList.at(i));
+        if (ite != splitData.end())
+        {
+            //        QDateTime time = QDateTime::currentDateTime();
+            //        qDebug()<<QString("开始匹配%1,时间%2").arg(ite.key()).arg(time.toString());
+            matchTask *task = new matchTask(m, ite.value(), this);
+            QThreadPool::globalInstance()->start(task);
+            //        rescMatch(m, ite.value());
+            //        QDateTime time2 = QDateTime::currentDateTime();
+            //        qDebug()<<QString("匹配结束%1,时间%2,耗时%3秒").arg(ite.key()).arg(time.toString()).arg(time.secsTo(time2));
+        }
     }
+
     while (QThreadPool::globalInstance()->activeThreadCount() != 0)
     {
         QThread::msleep(1000);
+        ui->listWidget->clear();
+        for (int i=0; i < g_Task.size(); i++)
+        {
+            ui->listWidget->addItem(g_Task.at(i));
+        }
         QApplication::processEvents();
     }
 
@@ -1970,7 +1982,7 @@ public:
 protected:
     bool addOne();
     virtual bool check();
-    int *index;
+    int index[10];
     QList<SData> &m_list;
     int curCount;
     int col;
@@ -2010,8 +2022,8 @@ CIndex::CIndex(int resclevel, QList<SData> &list, QList<int> muchCol, QList<int>
     col = muchCol.at(0);
     payCol = muchCol.at(1);
     inTime = inTimeList;
-    index = new int[MaxCount];
-    for (int i=0; i < MaxCount; i++)
+//    index = new int[MaxCount];
+    for (int i=0; i < 10; i++)
     {
         index[i] = -1;
     }
@@ -2024,7 +2036,7 @@ CIndex::CIndex(int resclevel, QList<SData> &list, QList<int> muchCol, QList<int>
 
 CIndex::~CIndex()
 {
-    delete [] index;
+//    delete [] index;
 }
 
 bool CIndex::add()
@@ -2834,7 +2846,11 @@ void Widget::matchOtherLine(SMatch m, QList<SData> &list)
                             listInTime1.push_back(k);
                         }
                     }
-                    if (listInTime1.size() == 1)
+                    if (listInTime1.size() == 0)
+                    {
+                        qDebug()<<QString("未找到可以匹配的首列数据.");
+                    }
+                    else if (listInTime1.size() == 1)
                     {
                         qDebug()<<QString("行%1和行%2-%3日期相同且只有一个,合并.").arg(list.at(listInTime1.at(0)).row+1).arg(list.at(i).row+1).arg(list.at(j).row+1);
                         ui->textEdit_Match->append(QString("行%1和行%2-%3日期相同且只有一个,合并.").arg(list.at(listInTime1.at(0)).row+1).arg(list.at(i).row+1).arg(list.at(j).row+1));
@@ -2992,7 +3008,13 @@ matchTask::matchTask(SMatch m, QList<SData> &list, Widget *p)
 
 void matchTask::run()
 {
+    g_mutex.lock();
+    g_Task.push_back(m_list.at(0).list.at(m_m.NameColNum));
+    g_mutex.unlock();
     m_p->rescMatch(m_m, m_list);
+    g_mutex.lock();
+    g_Task.removeOne(m_list.at(0).list.at(m_m.NameColNum));
+    g_mutex.unlock();
 }
 
 CRIndex::CRIndex(int resclevel, QList<SData> &list, QList<int> muchCol, QList<int> inTimeList)
