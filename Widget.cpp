@@ -198,6 +198,9 @@ void Widget::onProc()
     QList<SData> listData;
     QMap<SData, int> hashData;
     QStringList list = string.split("\n");
+
+    float sum = 0.0;
+    int delCount = 0;
     for (int i=3; i < list.size(); i++)
     {
         ui->progressBar->setValue(50*i/list.size());
@@ -221,33 +224,69 @@ void Widget::onProc()
 
                     if (data.isEmpty() && ite.key().isEmpty())
                     {
-                        qDebug()<<QString/*::fromLocal8Bit*/("重复：行%1和行%2，均无数据，不追加").arg(row+1).arg(data.row+1);
+                        qDebug()<<QString/*::fromLocal8Bit*/("重复：行%1和行%2，均无数据，不追加%3").arg(row+1).arg(data.row+1).arg(data.list.at(g_keyList.at(0)));
+                        sum += data.list.at(g_keyList.at(0)).toFloat();
+                        delCount++;
 //                        ui->textEdit->append(QString/*::fromLocal8Bit*/("重复：行%1和行%2，均无数据，不追加").arg(row+1).arg(data.row+1));
                         continue;
                     }
                     else if (!data.isEmpty() && !ite.key().isEmpty())
                     {
-                        qDebug()<<QString/*::fromLocal8Bit*/("重复：行%1和行%2，均有数据").arg(row+1).arg(data.row+1);
+                        qDebug()<<QString/*::fromLocal8Bit*/("重复：行%1和行%2，均有数据%3").arg(row+1).arg(data.row+1).arg(data.list.at(g_keyList.at(0)));
                         ui->textEdit->append(QString/*::fromLocal8Bit*/("重复：行%1和行%2，均有数据").arg(row+1).arg(data.row+1));
+                        sum += data.list.at(g_keyList.at(0)).toFloat();
+                        for (int j=0; j < data.list.size(); j++)
+                        {
+                            if (g_keyList.contains(j))
+                            {
+                                data.list[j] = "";
+                            }
+                        }
+                        QString tmp;
+                        for (int j=0; j < data.list.size(); j++)
+                        {
+                            if (j > 0)
+                            {
+                                tmp += ",";
+                            }
+                            tmp += data.list.at(j);
+                        }
+//                        tmp += "\r";
+                        data.data = tmp;
+//                        delCount++;
                         listData.push_back(data);
                     }
                     else if (data.isEmpty() && !ite.key().isEmpty())
                     {
-                        qDebug()<<QString/*::fromLocal8Bit*/("重复：行%1和行%2，前有数据，后无数据，不追加").arg(row+1).arg(data.row+1);
+                        qDebug()<<QString/*::fromLocal8Bit*/("重复：行%1和行%2，前有数据，后无数据，不追加%3").arg(row+1).arg(data.row+1).arg(data.list.at(g_keyList.at(0)));
+                        sum += data.list.at(g_keyList.at(0)).toFloat();
+                        delCount++;
                         continue;
                     }
                     else if (!data.isEmpty() && ite.key().isEmpty())
                     {
                         int index = listData.indexOf(data);
-                        qDebug()<<QString/*::fromLocal8Bit*/("重复：行%1和行%2，前无数据，后有数据，删前者，追加").arg(row+1).arg(data.row+1);
-                        listData.removeAt(index);
+                        qDebug()<<QString/*::fromLocal8Bit*/("重复：行%1和行%2，前无数据，后有数据，删前者，追加%3").arg(row+1).arg(data.row+1).arg(data.list.at(g_keyList.at(0)));
+                        sum += data.list.at(g_keyList.at(0)).toFloat();
+
+                        if (index != -1)
+                        {
+                            listData.removeAt(index);
+                            delCount++;
+                        }
+
                         listData.push_back(data);
                     }
                 }
                 else
                 {
                     hashData.insert(data, data.row);
+                    listData.push_back(data);
                 }
+            }
+            else
+            {
+                listData.push_back(data);
             }
 //            listData.push_back(data);
         }
@@ -261,50 +300,50 @@ void Widget::onProc()
 
     hashData.clear();
     //输出至文件
-    for (int i=0; i < listData.size(); i++)
-    {
-        ui->progressBar->setValue(50+50*i/listData.size());
-        QApplication::processEvents();
-        QMap<SData, int>::iterator ite = hashData.find(listData.at(i));
-        if (ite != hashData.end())
-        {
-            for (int j=0; j < listData.size(); j++)
-            {
-//                qDebug()<<"cycle"<<i;
-                if (i == j)
-                {
-                    continue;
-                }
-                if (listData.at(i).isChecked)
-                {
-                    continue;
-                }
-                if (listData.at(i) == listData.at(j))
-                {
+//    for (int i=0; i < listData.size(); i++)
+//    {
+//        ui->progressBar->setValue(50+50*i/listData.size());
+//        QApplication::processEvents();
+//        QMap<SData, int>::iterator ite = hashData.find(listData.at(i));
+//        if (ite != hashData.end())
+//        {
+//            for (int j=0; j < listData.size(); j++)
+//            {
+////                qDebug()<<"cycle"<<i;
+//                if (i == j)
+//                {
+//                    continue;
+//                }
+//                if (listData.at(i).isChecked)
+//                {
+//                    continue;
+//                }
+//                if (listData.at(i) == listData.at(j))
+//                {
 
-                    listData[i].data.replace("\r", "");
-                    listData[i].data += ",";
-                    listData[i].data += QString/*::fromLocal8Bit*/("重复");
-                    listData[i].data += ",";
-                    listData[i].data += QString/*::fromLocal8Bit*/("与%1行重复").arg(j+3+1);
-                    listData[i].data += "\r";
+//                    listData[i].data.replace("\r", "");
+//                    listData[i].data += ",";
+//                    listData[i].data += QString/*::fromLocal8Bit*/("重复");
+//                    listData[i].data += ",";
+//                    listData[i].data += QString/*::fromLocal8Bit*/("与%1行重复").arg(j+3+1);
+//                    listData[i].data += "\r";
 
-                    listData[j].data.replace("\r", "");
-                    listData[j].data += ",";
-                    listData[j].data += QString/*::fromLocal8Bit*/("重复");
-                    listData[j].data += ",";
-                    listData[j].data += QString/*::fromLocal8Bit*/("与%1行重复").arg(i+3+1);
-                    listData[j].data += "\r";
-                }
-            }
-        }
-        else
-        {
-          hashData.insert(listData.at(i), i);
-        }
-        listData[i].isChecked = true;
-        qDebug()<<"check"<<i;
-    }
+//                    listData[j].data.replace("\r", "");
+//                    listData[j].data += ",";
+//                    listData[j].data += QString/*::fromLocal8Bit*/("重复");
+//                    listData[j].data += ",";
+//                    listData[j].data += QString/*::fromLocal8Bit*/("与%1行重复").arg(i+3+1);
+//                    listData[j].data += "\r";
+//                }
+//            }
+//        }
+//        else
+//        {
+//          hashData.insert(listData.at(i), i);
+//        }
+//        listData[i].isChecked = true;
+//        qDebug()<<"check"<<i;
+//    }
 
     QString outFile = ui->lineEdit_Out->text();
     QFile out(outFile);
@@ -325,6 +364,7 @@ void Widget::onProc()
     }
     ui->progressBar->setValue(100);
     file.close();
+    qDebug()<<QString/*::fromLocal8Bit*/("共删除%1行，总金额为：%2").arg(delCount).arg(sum);
     qDebug()<<"done!";
 }
 
@@ -1193,7 +1233,7 @@ void Widget::onMatch()
             //        qDebug()<<QString("开始匹配%1,时间%2").arg(ite.key()).arg(time.toString());
             matchTask *task = new matchTask(m, ite.value(), this);
             QThreadPool::globalInstance()->start(task);
-            //        rescMatch(m, ite.value());
+//                    rescMatch(m, ite.value());
             //        QDateTime time2 = QDateTime::currentDateTime();
             //        qDebug()<<QString("匹配结束%1,时间%2,耗时%3秒").arg(ite.key()).arg(time.toString()).arg(time.secsTo(time2));
         }
@@ -2482,40 +2522,44 @@ void Widget::rescMatch(const SMatch m, QList<SData> &list)
                     qDebug()<<info;
                     //                        ui->textEdit_Match->append(info);
                 }
-                //挪数据
-                for (int n=m.muchList.at(1); n < list.at(matchIndex).list.size(); n++)
+                if (matchIndex != cindex.getMatchIndex().at(0))
                 {
-                    if (n < cindex.data(0).list.size())
+                    //挪数据
+                    for (int n=m.muchList.at(1); n < list.at(matchIndex).list.size(); n++)
                     {
-                        cindex.data(0).list[n] = list.at(matchIndex).list[n];
+                        if (n < cindex.data(0).list.size())
+                        {
+                            cindex.data(0).list[n] = list.at(matchIndex).list[n];
+                        }
+                    }
+                    //删除付款金额
+                    list[matchIndex].list[m.muchList.at(1)] = "";
+                    QString info = QString/*::fromLocal8Bit*/("行%1和行%2数据匹配成功！复制数据。").arg(cindex.getLine()).arg(list.at(matchIndex).row+1);
+                    qDebug()<<info;
+                    //是否删除行
+                    bool canDel = true;
+                    for (int n=0; n < m.inTimeList.size(); n++)
+                    {
+                        if (!list.at(matchIndex).list.at(m.inTimeList.at(n)).isEmpty())
+                        {
+                            canDel = false;
+                            break;
+                        }
+                    }
+                    if (canDel)
+                    {
+                        //                            qDebug()<<QString/*::fromLocal8Bit*/("行%1入账时间为空，删除。").arg(listData.at(j).row+1);;
+                        //                hashDel.insert(matchIndex, matchIndex);
+                        list[matchIndex].canDel = true;
+                        list[matchIndex].isChecked = true;
+                    }
+                    else
+                    {
+                        list[matchIndex].canDel = false;
+                        qDebug()<<QString/*::fromLocal8Bit*/("行%1入账时间非空，不删除。").arg(list.at(matchIndex).row+1);;
                     }
                 }
-                //删除付款金额
-                list[matchIndex].list[m.muchList.at(1)] = "";
-                QString info = QString/*::fromLocal8Bit*/("行%1和行%2数据匹配成功！复制数据。").arg(cindex.getLine()).arg(list.at(matchIndex).row+1);
-                qDebug()<<info;
-                //是否删除行
-                bool canDel = true;
-                for (int n=0; n < m.inTimeList.size(); n++)
-                {
-                    if (!list.at(matchIndex).list.at(m.inTimeList.at(n)).isEmpty())
-                    {
-                        canDel = false;
-                        break;
-                    }
-                }
-                if (canDel)
-                {
-                    //                            qDebug()<<QString/*::fromLocal8Bit*/("行%1入账时间为空，删除。").arg(listData.at(j).row+1);;
-                    //                hashDel.insert(matchIndex, matchIndex);
-                    list[matchIndex].canDel = true;
-                    list[matchIndex].isChecked = true;
-                }
-                else
-                {
-                    list[matchIndex].canDel = false;
-                    qDebug()<<QString/*::fromLocal8Bit*/("行%1入账时间非空，不删除。").arg(list.at(matchIndex).row+1);;
-                }
+
                 cindex.orderData();
                 break;
             }
@@ -2817,7 +2861,7 @@ void Widget::matchOtherLine(SMatch m, QList<SData> &list)
                     float vv3 = list.at(i).list.at(m.inTimeList.at(2)-1).toFloat();
                     list[i].list[m.muchList.at(0)] = QString::number(vv1 + vv2 + vv3);
 
-                    list[j].list[m.inTimeList.at(2)] = "";
+                    list[j].list[m.inTimeList.at(2)-1] = "";
                     vv1 = list.at(j).list.at(m.inTimeList.at(0)-1).toFloat();
                     vv2 = list.at(j).list.at(m.inTimeList.at(1)-1).toFloat();
                     vv3 = list.at(j).list.at(m.inTimeList.at(2)-1).toFloat();
@@ -2888,7 +2932,7 @@ void Widget::matchOtherLine(SMatch m, QList<SData> &list)
                             vv3 = list.at(i).list.at(m.inTimeList.at(2)-1).toFloat();
                             list[i].list[m.muchList.at(0)] = QString::number(vv1 + vv2 + vv3);
 
-                            list[listInTime1.at(0)].list[m.inTimeList.at(0)] = "";
+                            list[listInTime1.at(0)].list[m.inTimeList.at(0)-1] = "";
                             vv1 = list.at(listInTime1.at(0)).list.at(m.inTimeList.at(0)-1).toFloat();
                             vv2 = list.at(listInTime1.at(0)).list.at(m.inTimeList.at(1)-1).toFloat();
                             vv3 = list.at(listInTime1.at(0)).list.at(m.inTimeList.at(2)-1).toFloat();
