@@ -169,6 +169,9 @@ public slots:
     void onOrderCheck();
     void onMatch1();
 
+    void onSplitFFile();
+    void onSplitF();
+
 private:
     void initHash();
     bool checkInput();

@@ -49,6 +49,9 @@ Widget::Widget(QWidget *parent)
 
     connect(ui->pBtn_SelectFileMatch, SIGNAL(clicked(bool)), this, SLOT(onSelectMatchFile()));
     connect(ui->pBtn_Match, SIGNAL(clicked(bool)), this, SLOT(onMatch()));
+
+    connect(ui->pBtn_SelectSplit, SIGNAL(clicked(bool)), this, SLOT(onSplitFFile()));
+    connect(ui->pBtn_SplitF, SIGNAL(clicked(bool)), this, SLOT(onSplitF()));
 }
 
 Widget::~Widget()
@@ -1706,6 +1709,287 @@ void Widget::onMatch1()
         out.write(line.toLocal8Bit());
     }
 //    ui->progressBar->setValue(100);
+    file.close();
+    qDebug()<<"done!";
+}
+
+void Widget::onSplitFFile()
+{
+    QString matchFile = QFileDialog::getOpenFileName(this);
+    if (matchFile.isEmpty())
+    {
+        qDebug()<<"splitFFile is empty";
+        ui->lineEdit_FileNameSplit->setText("");
+        return;
+    }
+    ui->lineEdit_FileNameSplit->setText(matchFile);
+}
+
+void Widget::onSplitF()
+{
+    QString matchFile = ui->lineEdit_FileNameSplit->text();
+    QString outFile = ui->lineEdit_OutSplit->text();
+    if (outFile.isEmpty())
+    {
+        QMessageBox::warning(this, QString/*::fromLocal8Bit*/("警告"),
+                             QString/*::fromLocal8Bit*/("请填写输出文件名！"), QMessageBox::Ok);
+        return;
+    }
+
+    QString keyColStr = "G";
+    int keyCol;
+    if (!getCol(keyColStr, keyCol))
+    {
+        return;
+    }
+
+    QString ColListStr = "H;I;D";
+    QList<int> colList;
+    if (!getColList(ColListStr, colList))
+    {
+        return;
+    }
+    if (colList.size() > 10)
+    {
+        qDebug()<<"超过10列";
+        return;
+    }
+
+    QString addListStr = "E;F";
+    QList<int> addList;
+    if (!getColList(addListStr, addList))
+    {
+        return;
+    }
+
+    int maxCol = keyCol;
+    if (keyCol > maxCol)
+    {
+        maxCol = keyCol;
+    }
+    for (int i=0; i < colList.size(); i++)
+    {
+        if (colList.at(i) > maxCol)
+        {
+            maxCol = colList.at(i);
+        }
+    }
+    for (int i=0; i < addList.size(); i++)
+    {
+        if (addList.at(i) > maxCol)
+        {
+            maxCol = addList.at(i);
+        }
+    }
+
+
+    QFile file(matchFile);
+    if (!file.open(QIODevice::ReadOnly))
+    {
+        qDebug()<<"open matchFile failed";
+        return;
+    }
+
+    QByteArray arr = file.readAll();
+    QTextCodec *codec = QTextCodec::codecForName("GB18030");
+    QString string = codec->toUnicode(arr);
+
+    QList<SData> listData;
+    QStringList list = string.split("\n");
+    QMap<QString, QList<SData> > splitData;
+    QList<QString> orderList;
+    for (int i=1; i < list.size(); i++)
+    {
+//        ui->progressBar->setValue(50*i/list.size());
+        SData data;
+        QString tmp = list.at(i);
+        convertMuch(tmp);
+        QStringList rec = tmp.split(",");
+        if (rec.size() > maxCol)
+        {
+            data.row = i;
+            data.list = rec;
+            data.data = tmp;
+            data.canDel = false;
+            listData.push_back(data);
+        }
+        else
+        {
+            qDebug()<<QString/*::fromLocal8Bit*/("行%1列数少于%2").arg(i+1).arg(maxCol);
+        }
+    }
+
+    for (int i=0; i < listData.size(); i++)
+    {
+        QString tmpKeyStr = listData.at(i).list.at(keyCol);
+        QStringList keyList = tmpKeyStr.split("|");
+        if (keyList.size() <= 1)
+        {
+            continue;
+        }
+        if (listData.at(i).list.at(0).isEmpty())
+        {
+            continue;
+        }
+        bool hasDiff = false;
+        for (int j=1; j < keyList.size(); j++)
+        {
+            if (keyList.at(0) != keyList.at(j))
+            {
+                hasDiff = true;
+                break;
+            }
+        }
+        if (!hasDiff)
+        {
+            continue;
+        }
+        QStringList list[10];
+        for (int j=0; j < colList.size(); j++)
+        {
+            SData &d = listData[i];
+            QString tmpStr = listData.at(i).list.at(colList.at(j));
+            QStringList spList = listData.at(i).list.at(colList.at(j)).split("|");
+            list[j] = spList;
+            if (list[j].size() != keyList.size())
+            {
+                qDebug()<<QString("行%1各列个数不对应！").arg(listData.at(i).row + 1);
+                return;
+            }
+        }
+        qDebug()<<QString("行%1进行拆分！").arg(listData.at(i).row + 1);
+        QList<QString> listRow;
+        QList<QList<int> >listSperate;
+        for (int j=0; j < keyList.size(); j++)
+        {
+            bool exist = false;
+            for (int k=0; k < listRow.size(); k++)
+            {
+                if (keyList.at(j) == listRow.at(k))
+                {
+                    exist = true;
+                    listSperate[k].push_back(j);
+                }
+            }
+            if (!exist)
+            {
+                listRow.push_back(keyList.at(j));
+                QList<int> tmpList;
+                tmpList.push_back(j);
+                listSperate.push_back(tmpList);
+            }
+        }
+        SData data = listData.at(i);
+        //?????????
+        for (int j=maxCol+1; j < data.list.size(); j++)
+        {
+            data.list[j] = "";
+        }
+        SData tmpData = data;
+        for (int j=0; j < listRow.size(); j++)
+        {
+            if (j == 0)
+            {
+                QString tmpStr;
+                for (int k=0; k < listSperate.at(j).size(); k++)
+                {
+                    if (k > 0)
+                    {
+                        tmpStr += "|";
+                    }
+                    tmpStr += listRow.at(j);
+                }
+                listData[i].list[keyCol] = tmpStr;
+                for (int k=0; k < colList.size(); k++)
+                {
+                    QString newStr;
+                    for (int m=0; m < listSperate.at(j).size(); m++)
+                    {
+                        if (m > 0)
+                        {
+                            newStr += "|";
+                        }
+                        newStr += list[k].at(listSperate.at(j).at(m));
+                    }
+                    listData[i].list[colList.at(k)] = newStr;
+                }
+                for (int k=0; k < addList.size(); k++)
+                {
+                    float v = 0.0;
+                    for (int m=0; m < listSperate.at(j).size(); m++)
+                    {
+                        v += list[k].at(listSperate.at(j).at(m)).toFloat();
+                    }
+                    listData[i].list[addList.at(k)] = QString::number(v);
+                }
+            }
+            else
+            {
+                QString tmpStr;
+                for (int k=0; k < listSperate.at(j).size(); k++)
+                {
+                    if (k > 0)
+                    {
+                        tmpStr += "|";
+                    }
+                    tmpStr += listRow.at(j);
+                }
+                data.list[keyCol] = tmpStr;
+                for (int k=0; k < colList.size(); k++)
+                {
+                    QString newStr;
+                    for (int m=0; m < listSperate.at(j).size(); m++)
+                    {
+                        if (m > 0)
+                        {
+                            newStr += "|";
+                        }
+                        newStr += list[k].at(listSperate.at(j).at(m));
+                    }
+                    data.list[colList.at(k)] = newStr;
+                }
+                for (int k=0; k < addList.size(); k++)
+                {
+                    float v = 0.0;
+                    for (int m=0; m < listSperate.at(j).size(); m++)
+                    {
+                        v += list[k].at(listSperate.at(j).at(m)).toFloat();
+                    }
+                    data.list[addList.at(k)] = QString::number(v);
+                }
+                listData.insert(i+1, data);
+                i++;
+            }
+        }
+    }
+
+    //输出文件
+    QFile out(outFile);
+    if (!out.open(QIODevice::ReadWrite | QIODevice::Truncate))
+    {
+        qDebug()<<"open out file failed!";
+        return;
+    }
+    if (list.size() >=1)
+    {
+        out.write(list.at(0).toLocal8Bit());
+    }
+
+
+    for (int i=0; i < listData.size(); i++)
+    {
+        QString line;
+        for (int j=0; j < listData.at(i).list.size(); j++)
+        {
+            if (j > 0)
+            {
+                line += ",";
+            }
+            line += listData.at(i).list.at(j);
+        }
+        line += "\n";
+        out.write(line.toLocal8Bit());
+    }
     file.close();
     qDebug()<<"done!";
 }
