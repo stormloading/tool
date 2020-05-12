@@ -2498,14 +2498,14 @@ void Widget::orderMisMatch(SMatch m, QList<SData> &list)
         }
     }
 }
-
+#define delta 0.000001
 bool Widget::matchSCal(float v)
 {
-    if ((v > 1.0499 && v < 1.0501)
-            || (v > 0.7999 && v < 0.8001)
-            || (v > 0.9249 && v < 0.9251)
-            || (v > 1.6799 && v < 1.6801)
-            || (v > 0.4499 && v < 0.4501))
+    if ((v > (1.05-delta) && v < (1.05+delta))
+            || (v > (0.8-delta) && v < (0.8+delta))
+            || (v > (0.925-delta) && v < (0.925+delta))
+            || (v > (1.68-delta) && v < (1.68+delta))
+            || (v > (0.45-delta) && v < (0.45+delta)))
     {
         return true;
     }
