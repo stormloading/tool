@@ -148,7 +148,12 @@ friend class matchTask;
 public:
     Widget(QWidget *parent = nullptr);
     ~Widget();
+
+signals:
+    void add(QString txt);
 public slots:
+    void onAdd(QString txt);
+
     void onClicked();
     void onSelectFile();
     void onProc();
@@ -172,6 +177,8 @@ public slots:
     void onSplitFFile();
     void onSplitF();
 
+    void onCat();
+
 private:
     void initHash();
     bool checkInput();
@@ -184,6 +191,8 @@ private:
     void orderMisMatch(SMatch m, QList<SData> &list);
     bool matchSCal(float v);
     void rescMatch(SMatch m, QList<SData> &list);
+    void rescCat(SMatch m, QList<SData> &list);
+    void adjustMCol(SMatch m, QList<SData> &list);
     void matchOtherLine(SMatch m, QList<SData> &list);
 
     void convertMuch(QString &str);
