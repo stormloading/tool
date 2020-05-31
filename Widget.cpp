@@ -54,6 +54,9 @@ Widget::Widget(QWidget *parent)
     connect(ui->pBtn_SplitF, SIGNAL(clicked(bool)), this, SLOT(onSplitF()));
     connect(ui->pBtn_CatLine, SIGNAL(clicked(bool)), this, SLOT(onCat()));
     connect(this, SIGNAL(add(QString)), this, SLOT(onAdd(QString)));
+
+    connect(ui->pBtn_SelectFind, SIGNAL(clicked(bool)), this, SLOT(onSelectFind()));
+    connect(ui->pBtn_Find, SIGNAL(clicked(bool)), this, SLOT(onFind()));
 }
 
 Widget::~Widget()
@@ -2125,6 +2128,7 @@ void Widget::onCat()
             data.list = rec;
             data.data = tmp;
             data.canDel = false;
+            data.isChecked = false;
             QMap<QString, QList<SData> >::iterator ite = splitData.find(data.list.at(NameColNum));
             if (ite == splitData.end())
             {
@@ -2164,9 +2168,9 @@ void Widget::onCat()
     }
     if (list.size() >=3)
     {
-        out.write(list.at(0).toLocal8Bit().replace("\r", "\n"));
-        out.write(list.at(1).toLocal8Bit().replace("\r", "\n"));
-        out.write(list.at(2).toLocal8Bit().replace("\r", "\n"));
+        out.write(list.at(0).toLocal8Bit().replace("\r", "\n\r"));
+        out.write(list.at(1).toLocal8Bit().replace("\r", "\n\r"));
+        out.write(list.at(2).toLocal8Bit().replace("\r", "\n\r"));
     }
 
 
@@ -2196,11 +2200,11 @@ void Widget::onCat()
                 }
                 line += ite.value().at(i).list.at(j);
             }
-            if (!ite.value().at(i).isChecked)
-            {
-                line.replace("\r", "");
-                line += QString/*::fromLocal8Bit*/(",未匹配");
-            }
+//            if (!ite.value().at(i).isChecked)
+//            {
+//                line.replace("\r", "");
+//                line += QString/*::fromLocal8Bit*/(",未匹配");
+//            }
             line += "\n";
             saveCount++;
             out.write(line.toLocal8Bit());
@@ -2208,6 +2212,163 @@ void Widget::onCat()
     }
     file.close();
 
+    qDebug()<<"done!";
+}
+
+void Widget::onSelectFind()
+{
+    QString matchFile = QFileDialog::getOpenFileName(this);
+    if (matchFile.isEmpty())
+    {
+        qDebug()<<"FindFile is empty";
+        ui->lineEdit_Find->setText("");
+        return;
+    }
+    ui->lineEdit_Find->setText(matchFile);
+}
+
+void Widget::onFind()
+{
+    QString matchFile = ui->lineEdit_Find->text();
+    QString outFile = ui->lineEdit_OutFind->text();
+    if (outFile.isEmpty())
+    {
+        QMessageBox::warning(this, QString/*::fromLocal8Bit*/("警告"),
+                             QString/*::fromLocal8Bit*/("请填写输出文件名！"), QMessageBox::Ok);
+        return;
+    }
+
+//    QString nameColStr = ui->lineEdit_NameMatch->text();
+    QString nameColStr = "H";
+    int nameCol = 0;
+//    QString muchColStr = ui->lineEdit_MuchMatch->text();
+    QString muchColStr = "E";
+    int muchCol = 0;
+    if (!getCol(nameColStr, nameCol))
+    {
+        return;
+    }
+    if (!getCol(muchColStr, muchCol))
+    {
+        return;
+    }
+
+    QString slaveColStr = "I";
+    int slaveCol = 0;
+    if (!getCol(slaveColStr, slaveCol))
+    {
+        return;
+    }
+
+    int maxCol = nameCol;
+    if (muchCol > maxCol)
+    {
+        maxCol = muchCol;
+    }
+    if (slaveCol > maxCol)
+    {
+        maxCol = slaveCol;
+    }
+
+
+    QFile file(matchFile);
+    if (!file.open(QIODevice::ReadOnly))
+    {
+        qDebug()<<"open matchFile failed";
+        return;
+    }
+
+    QByteArray arr = file.readAll();
+    QTextCodec *codec = QTextCodec::codecForName("GB18030");
+    QString string = codec->toUnicode(arr);
+
+    QList<SData> listData;
+    QStringList list = string.split("\n");
+    for (int i=1; i < list.size(); i++)
+    {
+        SData data;
+        QString tmp = list.at(i);
+        convertMuch(tmp);
+        QStringList rec = tmp.split(",");
+        if (rec.size() > maxCol)
+        {
+            data.row = i;
+            data.list = rec;
+            data.data = tmp;
+            data.canDel = false;
+            data.isChecked = false;
+            listData.push_back(data);
+        }
+        else
+        {
+            qDebug()<<QString/*::fromLocal8Bit*/("行%1列数少于%2").arg(i+1).arg(maxCol);
+        }
+    }
+
+    for (int i=0; i < listData.size(); i++)
+    {
+        if (listData.at(i).isChecked)
+        {
+            continue;
+        }
+        for (int j=0; j < listData.size(); j++)
+        {
+            if (i == j)
+            {
+                continue;
+            }
+            if (listData.at(j).isChecked)
+            {
+                continue;
+            }
+            if (listData.at(i).list.at(nameCol) != listData.at(j).list.at(nameCol))
+            {
+                continue;
+            }
+            float sum = listData.at(i).list.at(muchCol).toFloat() + listData.at(j).list.at(muchCol).toFloat();
+            if (sum == 0)
+            {
+                //符合
+                listData[i].list.last().replace("\r", "");
+                listData[i].list.append(QString("匹配,与第%1行匹配").arg(listData.at(j).row+1));
+                listData[j].list.last().replace("\r", "");
+                listData[j].list.append(QString("匹配,与第%1行匹配").arg(listData.at(i).row+1));
+                listData[i].isChecked = true;
+                listData[j].isChecked = true;
+                break;
+            }
+        }
+    }
+
+    //输出文件
+    QFile out(outFile);
+    if (!out.open(QIODevice::ReadWrite | QIODevice::Truncate))
+    {
+        qDebug()<<"open out file failed!";
+        return;
+    }
+    if (list.size() >=1)
+    {
+        out.write(list.at(0).toLocal8Bit());
+    }
+
+
+    for (int i=0; i < listData.size(); i++)
+    {
+        QString line;
+        for (int j=0; j < listData.at(i).list.size(); j++)
+        {
+            if (j > 0)
+            {
+                line += ",";
+            }
+            line += listData.at(i).list.at(j);
+        }
+        line += "\n";
+        out.write(line.toLocal8Bit());
+    }
+
+    file.close();
     qDebug()<<"done!";
 }
 
@@ -2977,8 +3138,18 @@ bool CIndex::check()
 
 void Widget::rescMatch(const SMatch m, QList<SData> &list)
 {
+    float scaleVal = -1;
+    for (int i=0; i < list.size(); i++)
+    {
+        if (list.at(i).isChecked &&
+                !list.at(m.inTimeList.at(1)-1).isEmpty() &&
+                !list.at(m.inTimeList.at(2)-1).isEmpty())
+        {
+            scaleVal = list.at(i).list.at(m.inTimeList.at(1)-1).toFloat()/list.at(i).list.at(m.inTimeList.at(2)-1).toFloat();
+        }
+    }
     orderMisMatch(m, list);
-    matchOtherLine(m, list);
+    matchOtherLine(m, list, scaleVal);
 
     //匹配金额列直接对应（多行相加对应）
 
@@ -3316,7 +3487,7 @@ void Widget::rescCat(SMatch m, QList<SData> &list)
 {
     for (int i=0; i < list.size(); i++)
     {
-        if (list.at(i).list.at(m.inTimeList.at(0)).isEmpty() || list.at(i).canDel)
+        if (list.at(i).list.at(m.inTimeList.at(0)).isEmpty() || list.at(i).canDel || list.at(i).isChecked)
         {
             continue;
         }
@@ -3327,7 +3498,7 @@ void Widget::rescCat(SMatch m, QList<SData> &list)
         QList<int> list1;
         for (int j=0; j < list.size(); j++)
         {
-            if (list.at(j).list.at(m.inTimeList.at(0)).isEmpty())
+            if (list.at(j).list.at(m.inTimeList.at(0)).isEmpty() || list.at(j).canDel || list.at(j).isChecked)
             {
                 continue;
             }
@@ -3344,7 +3515,7 @@ void Widget::rescCat(SMatch m, QList<SData> &list)
         QList<int> list2;
         for (int j=0; j < list.size(); j++)
         {
-            if (list.at(j).list.at(m.inTimeList.at(1)).isEmpty())
+            if (list.at(j).list.at(m.inTimeList.at(1)).isEmpty() || list.at(j).canDel || list.at(j).isChecked)
             {
                 continue;
             }
@@ -3357,7 +3528,7 @@ void Widget::rescCat(SMatch m, QList<SData> &list)
         }
         if (col2 == 1)
         {
-            qDebug()<<QString("行%1与行%2匹配日期成功。").arg(list.at(i).row+1).arg(list.at(line2).row+1);
+            qDebug()<<QString("SSSS行%1与行%2匹配日期成功。").arg(list.at(i).row+1).arg(list.at(line2).row+1);
             list[i].list[m.inTimeList.at(1) - 1] = list.at(line2).list.at(m.inTimeList.at(1)-1);
             list[i].list[m.inTimeList.at(1)] = list.at(line2).list.at(m.inTimeList.at(1));
             list[i].list[m.inTimeList.at(1) + 1] = list.at(line2).list.at(m.inTimeList.at(1)+1);
@@ -3370,7 +3541,7 @@ void Widget::rescCat(SMatch m, QList<SData> &list)
         QList<int> list3;
         for (int j=0; j < list.size(); j++)
         {
-            if (list.at(j).list.at(m.inTimeList.at(2)).isEmpty())
+            if (list.at(j).list.at(m.inTimeList.at(2)).isEmpty() || list.at(j).canDel || list.at(j).isChecked)
             {
                 continue;
             }
@@ -3383,7 +3554,7 @@ void Widget::rescCat(SMatch m, QList<SData> &list)
         }
         if (col3 == 1)
         {
-            qDebug()<<QString("行%1与行%2匹配日期成功。").arg(list.at(i).row+1).arg(list.at(line3).row+1);
+            qDebug()<<QString("YYYY行%1与行%2匹配日期成功。").arg(list.at(i).row+1).arg(list.at(line3).row+1);
             list[i].list[m.inTimeList.at(2) - 1] = list.at(line3).list.at(m.inTimeList.at(2)-1);
             list[i].list[m.inTimeList.at(2)] = list.at(line3).list.at(m.inTimeList.at(2));
             list[i].list[m.inTimeList.at(2) + 1] = list.at(line3).list.at(m.inTimeList.at(2)+1);
@@ -3391,21 +3562,40 @@ void Widget::rescCat(SMatch m, QList<SData> &list)
             list[line3].canDel = true;
         }
 
+        if (col3 == 1 || col2 == 1)
+        {
+            list[i].isChecked = true;
+        }
+
+
         if (col1 > 1 && col1 == col2 && col1 == col3)
         {
             for (int j=0; j < list1.size(); j++)
             {
+                if (list1.at(j) == list2.at(j) && list1.at(j) == list3.at(j))
+                {
+                    continue;
+                }
                 list[list1.at(j)].list[m.inTimeList.at(1) - 1] = list.at(list2.at(j)).list.at(m.inTimeList.at(1)-1);
                 list[list1.at(j)].list[m.inTimeList.at(1)] = list.at(list2.at(j)).list.at(m.inTimeList.at(1));
                 list[list1.at(j)].list[m.inTimeList.at(1) + 1] = list.at(list2.at(j)).list.at(m.inTimeList.at(1)+1);
                 list[list1.at(j)].list[m.inTimeList.at(1) + 2] = list.at(list2.at(j)).list.at(m.inTimeList.at(1)+2);
-                list[list2.at(j)].canDel = true;
+                if (list1.at(j) != list2.at(j))
+                {
+                    list[list2.at(j)].canDel = true;
+                }
 
                 list[list1.at(j)].list[m.inTimeList.at(2) - 1] = list.at(list3.at(j)).list.at(m.inTimeList.at(2)-1);
                 list[list1.at(j)].list[m.inTimeList.at(2)] = list.at(list3.at(j)).list.at(m.inTimeList.at(2));
                 list[list1.at(j)].list[m.inTimeList.at(2) + 1] = list.at(list3.at(j)).list.at(m.inTimeList.at(2)+1);
                 list[list1.at(j)].list[m.inTimeList.at(2) + 2] = list.at(list3.at(j)).list.at(m.inTimeList.at(2)+2);
-                list[list3.at(j)].canDel = true;
+
+                if (list1.at(j) != list3.at(j))
+                {
+                    list[list3.at(j)].canDel = true;
+                }
+
+                list[list1.at(j)].isChecked = true;
                 qDebug()<<QString("匹配到多个日期一致的列。%1-%2-%3").arg(list.at(list1.at(j)).row+1).arg(list.at(list2.at(j)).row+1).arg(list.at(list3.at(j)).row+1);
             }
         }
@@ -3587,7 +3777,7 @@ void Widget::adjustMCol(SMatch m, QList<SData> &list)
     }
 }
 
-void Widget::matchOtherLine(SMatch m, QList<SData> &list)
+void Widget::matchOtherLine(SMatch m, QList<SData> &list, float val)
 {
     for (int i=0; i < list.size(); i++)
     {
@@ -3626,8 +3816,17 @@ void Widget::matchOtherLine(SMatch m, QList<SData> &list)
             float v2 = list.at(j).list.at(m.inTimeList.at(2)-1).toFloat();
 
             float v3 = v1/v2;
+            if (val > 0 && qAbs(v3 - val)>0.001)
+            {
+                continue;
+            }
             if (matchSCal(v3))
             {
+                if (val < 0)
+                {
+                    val = v3;
+                }
+                assert(qAbs(v3 - val) < 0.001);
                 QDate date2;
                 if (list.at(i).list.at(m.inTimeList.at(1)).contains("-"))
                 {

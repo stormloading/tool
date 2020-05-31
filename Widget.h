@@ -179,6 +179,9 @@ public slots:
 
     void onCat();
 
+    void onSelectFind();
+    void onFind();
+
 private:
     void initHash();
     bool checkInput();
@@ -193,7 +196,7 @@ private:
     void rescMatch(SMatch m, QList<SData> &list);
     void rescCat(SMatch m, QList<SData> &list);
     void adjustMCol(SMatch m, QList<SData> &list);
-    void matchOtherLine(SMatch m, QList<SData> &list);
+    void matchOtherLine(SMatch m, QList<SData> &list, float val);
 
     void convertMuch(QString &str);
 
